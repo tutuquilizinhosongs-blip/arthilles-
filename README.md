@@ -1,41 +1,59 @@
 # ArthillesBot
 
-Plataforma local de automacao inteligente para WhatsApp com Evolution API, backend Node.js, PostgreSQL, Redis, dashboard Next.js, n8n auxiliar e IA local gratuita com Ollama.
+ArthillesBot e uma plataforma local de atendimento WhatsApp para pequenas empresas. O sistema roda no Windows com Docker Desktop e combina Evolution API, backend Node.js, PostgreSQL, Redis, dashboard Next.js, n8n auxiliar e IA local gratuita com Ollama.
+
+O objetivo e oferecer uma base simples de instalar e pronta para evoluir como produto SaaS local: atendimento automatico, CRM, agendamento, dashboard administrativo e respostas assistidas por modelo open source.
 
 ## Arquitetura
 
 ```text
-WhatsApp -> Evolution API -> Webhook unico -> Backend Node.js -> PostgreSQL -> Dashboard Next.js
-                                      |
-                                      -> Ollama
+WhatsApp
+  -> Evolution API
+  -> Webhook unico do backend
+  -> Backend Node.js/Express
+  -> PostgreSQL
+  -> Dashboard Next.js
 
-n8n fica disponivel apenas para orquestracoes auxiliares.
+Redis: cache e suporte de infraestrutura
+n8n: orquestracao auxiliar, sem duplicar a regra principal
+Ollama: IA local gratuita
 ```
 
-## Requisitos no Windows
+## Stack
+
+- Docker Compose
+- Evolution API
+- n8n
+- PostgreSQL
+- Redis
+- Backend Node.js/Express
+- Dashboard Next.js
+- Ollama com modelo `llama3` por padrao
+
+## Instalacao no Windows
 
 1. Instale o Docker Desktop.
-2. Baixe este projeto do GitHub.
-3. Copie `.env.example` para `.env` ou deixe o script criar automaticamente.
-4. Rode:
+2. Baixe ou clone este projeto.
+3. Copie `.env.example` para `.env`.
+4. Inicie os servicos:
 
 ```powershell
 .\scripts\start-windows.ps1
 ```
 
-Se o Windows bloquear scripts PowerShell por politica de execucao, use:
+Se o Windows bloquear scripts PowerShell:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-windows.ps1
 ```
 
-Ou manualmente:
+Comando manual equivalente:
 
 ```powershell
 docker compose up -d --build
 ```
 
-## URLs
+## Acessos
 
 - Dashboard: http://localhost:3000
 - Backend: http://localhost:3001
@@ -43,60 +61,49 @@ docker compose up -d --build
 - n8n: http://localhost:5678
 - Ollama: http://localhost:11434
 
-## Baixar o modelo da IA local
+## IA local
 
-Depois que os containers estiverem rodando:
+Baixe o modelo padrao depois que o container subir:
 
 ```powershell
 docker exec -it arthilles_ollama ollama pull llama3
 ```
 
-O bot funciona sem APIs pagas. Se o modelo ainda nao existir, ele usa respostas deterministicas para cadastro e agenda.
+O atendimento principal nao depende de API paga. Se o modelo ainda nao existir, o backend usa respostas deterministicas para cadastro e agenda.
 
-## Conectar WhatsApp
+## WhatsApp
 
 1. Acesse a Evolution API em http://localhost:8080.
-2. Use a API key definida em `EVOLUTION_API_KEY` no `.env`.
-3. Crie ou use a instancia definida em `EVOLUTION_INSTANCE_NAME` (`arthilles` por padrao).
+2. Use a chave `EVOLUTION_API_KEY` definida no `.env`.
+3. Crie ou use a instancia definida em `EVOLUTION_INSTANCE_NAME`.
 4. Configure o webhook da instancia para:
 
 ```text
 http://backend:3001/webhook/evolution
 ```
 
-O backend tambem tenta configurar esse webhook automaticamente ao iniciar.
+O backend tambem tenta configurar esse webhook ao iniciar.
 
-A Evolution API e o n8n usam o mesmo container PostgreSQL, mas em bancos separados (`arthilles_evolution` e `arthilles_n8n`) para que suas migrations internas nao conflitem com as tabelas do ArthillesBot.
+## Teste rapido
 
-## Testar a mensagem "oi"
-
-Com o WhatsApp conectado pela Evolution API, envie:
+Com o WhatsApp conectado, envie:
 
 ```text
 oi
 ```
 
-O bot deve responder pedindo o nome completo e seguir o cadastro:
-
-- nome completo
-- telefone detectado pelo WhatsApp
-- email
-- tipo de empresa
-- cidade/estado
-- principal problema
-
-Ao final, ele mostra horarios disponiveis e agenda quando o usuario responde com o numero desejado.
+O bot inicia o cadastro, coleta dados do cliente, mostra horarios disponiveis e agenda quando o usuario escolhe um horario.
 
 ## Regras de agenda
 
 - Atendimento de segunda a sexta.
 - Horario padrao de 13:30 ate 16:30.
 - Reunioes de 1 hora.
-- Bloqueio automatico para horarios com menos de 6 horas.
+- Bloqueio automatico para horarios com menos de 6 horas de antecedencia.
 - Horarios ocupados nao aparecem.
-- Ferias, feriados e bloqueios manuais ficam em `availability_blocks`.
+- Ferias, feriados e bloqueios manuais usam `availability_blocks`.
 
-## Endpoints do backend
+## Endpoints
 
 - `GET /health`
 - `POST /webhook/evolution`
@@ -109,60 +116,56 @@ Ao final, ele mostra horarios disponiveis e agenda quando o usuario responde com
 - `GET /settings`
 - `PUT /settings`
 
-## Logs
-
-Todos os servicos:
+## Scripts Windows
 
 ```powershell
+.\scripts\start-windows.ps1
+.\scripts\stop-windows.ps1
 .\scripts\logs-windows.ps1
+.\scripts\backup-windows.ps1
 ```
 
-Servico especifico:
+Logs de um servico especifico:
 
 ```powershell
 .\scripts\logs-windows.ps1 backend
 ```
 
-## Backup do banco
-
-```powershell
-.\scripts\backup-windows.ps1
-```
-
-Fallback se houver bloqueio de politica de execucao:
+Backup com fallback de politica de execucao:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\backup-windows.ps1
-```
-
-Os arquivos `.sql` ficam em `backups/`.
-
-## Parar
-
-```powershell
-.\scripts\stop-windows.ps1
 ```
 
 ## Estrutura
 
 ```text
 arthilles/
-├── backend/
-├── dashboard/
-├── database/
-├── docker/
-├── docs/
-├── n8n/
-├── ollama/
-├── scripts/
-├── workflows/
-├── .env.example
-├── docker-compose.yml
-└── README.md
+|-- backend/
+|-- dashboard/
+|-- database/
+|-- docker/
+|-- docs/
+|-- n8n/
+|-- ollama/
+|-- scripts/
+|-- workflows/
+|-- .env.example
+|-- docker-compose.yml
+`-- README.md
 ```
 
-## Observacoes de seguranca
+## Bancos internos
+
+Todos usam o mesmo container PostgreSQL, mas com bancos separados para evitar conflito de migrations:
+
+- `arthillesbot`: dados do produto
+- `arthilles_evolution`: Evolution API
+- `arthilles_n8n`: n8n
+
+## Seguranca
 
 - Troque todas as senhas do `.env` antes de uso real.
-- Nao publique `.env`.
+- Nunca publique `.env`.
 - O projeto nao exige OpenAI, APIs pagas, SQLite ou servicos externos obrigatorios.
+- Em producao, revise exposicao de portas, senhas, backups e logs.
