@@ -30,6 +30,15 @@ Ollama: IA local gratuita
 - Dashboard Next.js
 - Ollama com modelo `llama3` por padrao
 
+## Login do painel
+
+Credenciais iniciais configuradas no `.env.example`:
+
+- Email: `admin@arthilles.local`
+- Senha: `admin123`
+
+Troque `ADMIN_EMAIL` e `ADMIN_PASSWORD` antes de uso real.
+
 ## Instalacao no Windows
 
 1. Instale o Docker Desktop.
@@ -51,6 +60,14 @@ Comando manual equivalente:
 
 ```powershell
 docker compose up -d --build
+```
+
+## Instalacao no Ubuntu
+
+```bash
+cp .env.example .env
+chmod +x scripts/*.sh
+./scripts/start-ubuntu.sh
 ```
 
 ## Acessos
@@ -76,7 +93,9 @@ O atendimento principal nao depende de API paga. Se o modelo ainda nao existir, 
 1. Acesse a Evolution API em http://localhost:8080.
 2. Use a chave `EVOLUTION_API_KEY` definida no `.env`.
 3. Crie ou use a instancia definida em `EVOLUTION_INSTANCE_NAME`.
-4. Configure o webhook da instancia para:
+4. No dashboard, abra `WhatsApp` e clique em `Criar instancia`.
+5. Clique em `Gerar QR Code` e leia o codigo com o WhatsApp.
+6. O webhook da instancia deve apontar para:
 
 ```text
 http://backend:3001/webhook/evolution
@@ -115,6 +134,15 @@ O bot inicia o cadastro, coleta dados do cliente, mostra horarios disponiveis e 
 - `POST /availability/block`
 - `GET /settings`
 - `PUT /settings`
+- `POST /auth/login`
+- `GET /messages`
+- `GET /conversations`
+- `GET /faqs`
+- `POST /faqs`
+- `GET /evolution/qrcode`
+- `GET /evolution/status`
+- `POST /evolution/instance`
+- `GET /status`
 
 ## Scripts Windows
 
@@ -135,6 +163,15 @@ Backup com fallback de politica de execucao:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\backup-windows.ps1
+```
+
+Ubuntu:
+
+```bash
+./scripts/start-ubuntu.sh
+./scripts/stop-ubuntu.sh
+./scripts/logs-ubuntu.sh
+./scripts/backup-ubuntu.sh
 ```
 
 ## Estrutura

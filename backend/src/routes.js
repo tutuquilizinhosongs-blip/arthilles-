@@ -1,15 +1,46 @@
 import express from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { query, getSettingsMap } from './db.js';
 import { getAvailableSlots } from './availability.js';
 import { handleConversation } from './conversation.js';
-import { sendWhatsAppText } from './evolution.js';
+import { sendWhatsAppText, getEvolutionInstanceStatus, getEvolutionQrCode, configureEvolutionWebhook, createEvolutionInstance } from './evolution.js';
 
 export const router = express.Router();
+
+function adminToken() {
+  return crypto
+    .createHash('sha256')
+    .update(`${process.env.ADMIN_EMAIL || 'admin@arthilles.local'}:${process.env.ADMIN_PASSWORD || 'admin123'}:${process.env.ADMIN_API_KEY || 'local'}`)
+    .digest('hex');
+}
+
+function requireAdmin(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.replace(/^Bearer\s+/i, '');
+  if (token && token === adminToken()) return next();
+  return res.status(401).json({ error: 'Nao autenticado' });
+}
 
 router.get('/health', async (req, res) => {
   await query('SELECT 1');
   res.json({ ok: true, service: 'arthillesbot-backend', time: new Date().toISOString() });
+});
+
+router.post('/auth/login', async (req, res) => {
+  const schema = z.object({ email: z.string().email(), password: z.string().min(1) });
+  const input = schema.parse(req.body);
+  const expectedEmail = process.env.ADMIN_EMAIL || 'admin@arthilles.local';
+  const expectedPassword = process.env.ADMIN_PASSWORD || 'admin123';
+
+  if (input.email !== expectedEmail || input.password !== expectedPassword) {
+    return res.status(401).json({ error: 'Email ou senha invalidos' });
+  }
+
+  res.json({
+    token: adminToken(),
+    user: { name: 'Administrador', email: expectedEmail }
+  });
 });
 
 router.post('/webhook/evolution', async (req, res) => {
@@ -30,6 +61,74 @@ router.post('/webhook/evolution', async (req, res) => {
 router.get('/clients', async (req, res) => {
   const result = await query('SELECT * FROM clients ORDER BY created_at DESC LIMIT 200');
   res.json(result.rows);
+});
+
+router.get('/messages', async (req, res) => {
+  const result = await query(
+    `SELECT messages.*, clients.full_name
+     FROM messages
+     LEFT JOIN clients ON clients.phone = messages.phone
+     ORDER BY messages.created_at DESC
+     LIMIT 300`
+  );
+  res.json(result.rows);
+});
+
+router.get('/conversations', async (req, res) => {
+  const result = await query(
+    `SELECT conversation_sessions.*, clients.full_name, clients.email
+     FROM conversation_sessions
+     LEFT JOIN clients ON clients.id = conversation_sessions.client_id
+     ORDER BY conversation_sessions.updated_at DESC
+     LIMIT 200`
+  );
+  res.json(result.rows);
+});
+
+router.get('/faqs', async (req, res) => {
+  const result = await query('SELECT * FROM faq_items ORDER BY created_at DESC');
+  res.json(result.rows);
+});
+
+router.post('/faqs', requireAdmin, async (req, res) => {
+  const schema = z.object({
+    question: z.string().min(3),
+    answer: z.string().min(3),
+    keywords: z.array(z.string()).default([]),
+    active: z.boolean().default(true)
+  });
+  const input = schema.parse(req.body);
+  const result = await query(
+    `INSERT INTO faq_items (question, answer, keywords, active)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [input.question, input.answer, input.keywords, input.active]
+  );
+  res.status(201).json(result.rows[0]);
+});
+
+router.put('/faqs/:id', requireAdmin, async (req, res) => {
+  const schema = z.object({
+    question: z.string().min(3),
+    answer: z.string().min(3),
+    keywords: z.array(z.string()).default([]),
+    active: z.boolean().default(true)
+  });
+  const input = schema.parse(req.body);
+  const result = await query(
+    `UPDATE faq_items
+     SET question = $2, answer = $3, keywords = $4, active = $5, updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [req.params.id, input.question, input.answer, input.keywords, input.active]
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: 'FAQ nao encontrada' });
+  res.json(result.rows[0]);
+});
+
+router.delete('/faqs/:id', requireAdmin, async (req, res) => {
+  await query('DELETE FROM faq_items WHERE id = $1', [req.params.id]);
+  res.status(204).end();
 });
 
 router.post('/clients', async (req, res) => {
@@ -115,7 +214,7 @@ router.get('/settings', async (req, res) => {
   res.json(await getSettingsMap());
 });
 
-router.put('/settings', async (req, res) => {
+router.put('/settings', requireAdmin, async (req, res) => {
   const entries = Object.entries(req.body || {});
   for (const [key, value] of entries) {
     await query(
@@ -126,4 +225,37 @@ router.put('/settings', async (req, res) => {
     );
   }
   res.json(await getSettingsMap());
+});
+
+router.get('/evolution/status', async (req, res) => {
+  res.json(await getEvolutionInstanceStatus());
+});
+
+router.post('/evolution/webhook', requireAdmin, async (req, res) => {
+  await configureEvolutionWebhook();
+  res.json({ ok: true });
+});
+
+router.post('/evolution/instance', requireAdmin, async (req, res) => {
+  res.json(await createEvolutionInstance());
+});
+
+router.get('/evolution/qrcode', async (req, res) => {
+  res.json(await getEvolutionQrCode());
+});
+
+router.get('/status', async (req, res) => {
+  const checks = await Promise.allSettled([
+    query('SELECT 1'),
+    getEvolutionInstanceStatus()
+  ]);
+
+  res.json({
+    backend: { ok: true },
+    postgres: { ok: checks[0].status === 'fulfilled' },
+    evolution: checks[1].status === 'fulfilled' ? checks[1].value : { ok: false },
+    ollama: { url: process.env.OLLAMA_BASE_URL || 'http://ollama:11434', model: process.env.OLLAMA_MODEL || 'llama3' },
+    n8n: { url: 'http://localhost:5678' },
+    redis: { configured: Boolean(process.env.REDIS_URL) }
+  });
 });

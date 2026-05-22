@@ -42,3 +42,18 @@ As migrations iniciais ficam em `database/init`.
 - `feat: add dashboard overview`
 - `chore: configure docker compose`
 - `docs: update windows installation guide`
+
+## Dashboard
+
+O painel possui login local usando `ADMIN_EMAIL` e `ADMIN_PASSWORD`. O token gerado pelo backend e salvo no `localStorage` do navegador.
+
+Telas disponiveis:
+
+- Visao geral
+- WhatsApp / QR Code
+- Clientes
+- Agendamentos
+- Conversas
+- Duvidas frequentes
+- Configuracoes
+- Status

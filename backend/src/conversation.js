@@ -70,6 +70,27 @@ function formatSlots(slots) {
   ].join('\n');
 }
 
+function wantsScheduling(message) {
+  return /\b(agenda|agendar|reuniao|reunião|marcar|horario|horário|consulta|call)\b/i.test(message);
+}
+
+async function findFaqAnswer(message) {
+  const terms = message.toLowerCase().split(/\s+/).filter((term) => term.length > 2);
+  const result = await query(
+    `SELECT question, answer, keywords
+     FROM faq_items
+     WHERE active = true
+     ORDER BY updated_at DESC`
+  );
+
+  for (const item of result.rows) {
+    const haystack = `${item.question} ${(item.keywords || []).join(' ')}`.toLowerCase();
+    if (terms.some((term) => haystack.includes(term))) return item.answer;
+  }
+
+  return null;
+}
+
 export async function handleConversation({ phone: rawPhone, body }) {
   const phone = normalizePhone(rawPhone);
   const cleanBody = String(body || '').trim();
@@ -85,6 +106,13 @@ export async function handleConversation({ phone: rawPhone, body }) {
   if (['oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite', 'inicio', 'início'].includes(cleanBody.toLowerCase())) {
     await updateSession(phone, 'collecting', {});
     reply = `Ola! Sou o ArthillesBot. Vou fazer seu cadastro rapido para encontrar um horario.\n${fields[0][1]}`;
+  } else if (session.state === 'greeting' && wantsScheduling(cleanBody)) {
+    await updateSession(phone, 'collecting', {});
+    reply = `Claro. Vou coletar seus dados para agendar.\n${fields[0][1]}`;
+  } else if (session.state === 'greeting') {
+    const faq = await findFaqAnswer(cleanBody);
+    const ai = faq || await askLocalAssistant({ state: session.state, faqMatched: Boolean(faq) }, cleanBody);
+    reply = ai || 'Posso responder duvidas ou agendar uma reuniao. Para comecar um agendamento, envie "agendar".';
   } else if (session.state === 'collecting' || session.state === 'greeting') {
     const nextField = fields.find(([key]) => !data[key]);
     if (nextField && cleanBody) {

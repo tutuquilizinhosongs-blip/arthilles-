@@ -7,6 +7,7 @@ import Redis from 'ioredis';
 import { router } from './routes.js';
 import { logger } from './logger.js';
 import { configureEvolutionWebhook } from './evolution.js';
+import { ensureApplicationSchema } from './db.js';
 
 const app = express();
 const port = Number(process.env.BACKEND_PORT || 3001);
@@ -29,5 +30,6 @@ redis.connect().then(() => logger.info('Redis connected')).catch((error) => {
 
 app.listen(port, '0.0.0.0', async () => {
   logger.info({ port }, 'ArthillesBot backend started');
+  await ensureApplicationSchema();
   await configureEvolutionWebhook();
 });

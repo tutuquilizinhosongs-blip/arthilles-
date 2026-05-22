@@ -1,18 +1,25 @@
-import { Activity, Bot, CalendarDays, Clock, Settings, Users } from 'lucide-react';
+'use client';
 
-const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+import { useEffect, useMemo, useState } from 'react';
+import QRCode from 'qrcode';
+import {
+  Activity,
+  Bot,
+  CalendarDays,
+  Clock,
+  HelpCircle,
+  LogOut,
+  MessageSquare,
+  QrCode,
+  RefreshCw,
+  Settings,
+  Users
+} from 'lucide-react';
 
-async function fetchJson(path, fallback) {
-  try {
-    const response = await fetch(`${backendUrl}${path}`, { cache: 'no-store' });
-    if (!response.ok) return fallback;
-    return response.json();
-  } catch {
-    return fallback;
-  }
-}
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 function dateLabel(value) {
+  if (!value) return '-';
   return new Date(value).toLocaleString('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'short',
@@ -20,111 +27,244 @@ function dateLabel(value) {
   });
 }
 
-export default async function Dashboard() {
-  const [health, clients, appointments, availability, settings] = await Promise.all([
-    fetchJson('/health', { ok: false }),
-    fetchJson('/clients', []),
-    fetchJson('/appointments', []),
-    fetchJson('/availability', []),
-    fetchJson('/settings', {})
-  ]);
+async function request(path, options = {}) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('arthilles_token') : null;
+  const response = await fetch(`${backendUrl}${path}`, {
+    ...options,
+    headers: {
+      'content-type': 'application/json',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    }
+  });
+  if (!response.ok) throw new Error(await response.text());
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+function qrImage(data) {
+  const value = data?.data?.base64 || data?.data?.qrcode?.base64 || data?.data?.code || data?.base64;
+  if (!value) return null;
+  if (String(value).startsWith('data:image')) return value;
+  if (String(value).length > 200) return `data:image/png;base64,${value}`;
+  return null;
+}
+
+export default function Dashboard() {
+  const [token, setToken] = useState('');
+  const [login, setLogin] = useState({ email: 'admin@arthilles.local', password: 'admin123' });
+  const [tab, setTab] = useState('overview');
+  const [data, setData] = useState({
+    health: {},
+    clients: [],
+    appointments: [],
+    availability: [],
+    settings: {},
+    messages: [],
+    conversations: [],
+    faqs: [],
+    status: {},
+    qr: null
+  });
+  const [faqForm, setFaqForm] = useState({ question: '', answer: '', keywords: '' });
+  const [settingsText, setSettingsText] = useState('');
+  const [qrSrc, setQrSrc] = useState('');
+  const [error, setError] = useState('');
+
+  const nav = useMemo(() => [
+    ['overview', Activity, 'Visao geral'],
+    ['whatsapp', QrCode, 'WhatsApp'],
+    ['clients', Users, 'Clientes'],
+    ['appointments', CalendarDays, 'Agendamentos'],
+    ['messages', MessageSquare, 'Conversas'],
+    ['faqs', HelpCircle, 'Duvidas'],
+    ['settings', Settings, 'Configuracoes'],
+    ['status', Activity, 'Status']
+  ], []);
+
+  async function loadAll() {
+    setError('');
+    const [health, clients, appointments, availability, settings, messages, conversations, faqs, status] = await Promise.all([
+      request('/health').catch(() => ({ ok: false })),
+      request('/clients').catch(() => []),
+      request('/appointments').catch(() => []),
+      request('/availability').catch(() => []),
+      request('/settings').catch(() => ({})),
+      request('/messages').catch(() => []),
+      request('/conversations').catch(() => []),
+      request('/faqs').catch(() => []),
+      request('/status').catch(() => ({}))
+    ]);
+    setData((current) => ({ ...current, health, clients, appointments, availability, settings, messages, conversations, faqs, status }));
+    setSettingsText(JSON.stringify(settings, null, 2));
+  }
+
+  useEffect(() => {
+    const stored = localStorage.getItem('arthilles_token');
+    if (stored) {
+      setToken(stored);
+      loadAll().catch((err) => setError(err.message));
+    }
+  }, []);
+
+  useEffect(() => {
+    const image = qrImage(data.qr);
+    if (image) {
+      setQrSrc(image);
+      return;
+    }
+
+    const code = data.qr?.data?.code || data.qr?.data?.pairingCode || data.qr?.code;
+    if (!code) {
+      setQrSrc('');
+      return;
+    }
+
+    QRCode.toDataURL(String(code), { width: 320, margin: 2 })
+      .then(setQrSrc)
+      .catch(() => setQrSrc(''));
+  }, [data.qr]);
+
+  async function doLogin(event) {
+    event.preventDefault();
+    setError('');
+    try {
+      const result = await request('/auth/login', { method: 'POST', body: JSON.stringify(login) });
+      localStorage.setItem('arthilles_token', result.token);
+      setToken(result.token);
+      await loadAll();
+    } catch {
+      setError('Login invalido. Confira ADMIN_EMAIL e ADMIN_PASSWORD no .env.');
+    }
+  }
+
+  async function loadQr() {
+    const qr = await request('/evolution/qrcode');
+    setData((current) => ({ ...current, qr }));
+  }
+
+  async function saveFaq(event) {
+    event.preventDefault();
+    await request('/faqs', {
+      method: 'POST',
+      body: JSON.stringify({
+        question: faqForm.question,
+        answer: faqForm.answer,
+        keywords: faqForm.keywords.split(',').map((item) => item.trim()).filter(Boolean),
+        active: true
+      })
+    });
+    setFaqForm({ question: '', answer: '', keywords: '' });
+    await loadAll();
+  }
+
+  async function saveSettings() {
+    await request('/settings', { method: 'PUT', body: settingsText });
+    await loadAll();
+  }
+
+  if (!token) {
+    return (
+      <main className="login-screen">
+        <form className="login-card" onSubmit={doLogin}>
+          <Bot size={34} />
+          <h1>ArthillesBot</h1>
+          <p>Painel administrativo local</p>
+          <label>Email<input value={login.email} onChange={(event) => setLogin({ ...login, email: event.target.value })} /></label>
+          <label>Senha<input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
+          <button type="submit">Entrar</button>
+          {error && <span className="error">{error}</span>}
+        </form>
+      </main>
+    );
+  }
 
   return (
     <main className="shell">
       <aside className="sidebar">
-        <div className="brand">
-          <Bot size={28} />
-          <div>
-            <strong>ArthillesBot</strong>
-            <span>WhatsApp local</span>
-          </div>
-        </div>
+        <div className="brand"><Bot size={28} /><div><strong>ArthillesBot</strong><span>Operacao local</span></div></div>
         <nav>
-          <a href="#clientes"><Users size={18} />Clientes</a>
-          <a href="#agenda"><CalendarDays size={18} />Agenda</a>
-          <a href="#calendario"><Clock size={18} />Calendario</a>
-          <a href="#config"><Settings size={18} />Configuracoes</a>
-          <a href="#status"><Activity size={18} />Status</a>
+          {nav.map(([id, Icon, label]) => (
+            <button className={tab === id ? 'active' : ''} key={id} onClick={() => setTab(id)}><Icon size={18} />{label}</button>
+          ))}
         </nav>
+        <button className="ghost" onClick={() => { localStorage.removeItem('arthilles_token'); setToken(''); }}><LogOut size={18} />Sair</button>
       </aside>
 
       <section className="content">
         <header className="topbar">
-          <div>
-            <h1>Atendimento e agenda</h1>
-            <p>Operacao local com Evolution API, PostgreSQL, n8n e Ollama.</p>
-          </div>
-          <span className={health.ok ? 'pill ok' : 'pill bad'}>{health.ok ? 'Online' : 'Offline'}</span>
+          <div><h1>{nav.find(([id]) => id === tab)?.[2]}</h1><p>WhatsApp, agenda, CRM e IA local em Docker.</p></div>
+          <button className="icon-button" onClick={loadAll}><RefreshCw size={18} />Atualizar</button>
         </header>
+        {error && <div className="banner">{error}</div>}
 
-        <section className="metrics">
-          <article><Users /><span>Clientes</span><strong>{clients.length}</strong></article>
-          <article><CalendarDays /><span>Agendamentos</span><strong>{appointments.length}</strong></article>
-          <article><Clock /><span>Horarios livres</span><strong>{availability.length}</strong></article>
-          <article><Bot /><span>IA local</span><strong>{settings.assistant?.model || 'llama3'}</strong></article>
-        </section>
+        {tab === 'overview' && (
+          <>
+            <section className="metrics">
+              <article><Users /><span>Clientes</span><strong>{data.clients.length}</strong></article>
+              <article><CalendarDays /><span>Agendamentos</span><strong>{data.appointments.length}</strong></article>
+              <article><MessageSquare /><span>Mensagens</span><strong>{data.messages.length}</strong></article>
+              <article><Bot /><span>IA local</span><strong>{data.settings.assistant?.model || 'llama3'}</strong></article>
+            </section>
+            <section className="grid">
+              <Panel title="Proximos horarios">{data.availability.slice(0, 8).map((slot) => <Line key={slot.startsAt} left={dateLabel(slot.startsAt)} right={dateLabel(slot.endsAt)} />)}</Panel>
+              <Panel title="Agendamentos recentes">{data.appointments.slice(0, 8).map((item) => <Line key={item.id} left={item.full_name} right={dateLabel(item.starts_at)} />)}</Panel>
+            </section>
+          </>
+        )}
 
-        <section className="grid">
-          <div id="clientes" className="panel">
-            <h2>Clientes</h2>
-            <div className="table">
-              {clients.map((client) => (
-                <div className="row" key={client.id}>
-                  <strong>{client.full_name}</strong>
-                  <span>{client.phone}</span>
-                  <span>{client.city || '-'} {client.state || ''}</span>
-                </div>
-              ))}
-              {!clients.length && <p className="empty">Nenhum cliente cadastrado ainda.</p>}
+        {tab === 'whatsapp' && (
+          <Panel title="Conexao WhatsApp">
+            <div className="actions">
+              <button onClick={() => request('/evolution/instance', { method: 'POST' }).then(loadQr)}>Criar instancia</button>
+              <button onClick={loadQr}><QrCode size={18} />Gerar QR Code</button>
+              <button onClick={() => request('/evolution/webhook', { method: 'POST' })}>Configurar webhook</button>
             </div>
-          </div>
+            {qrSrc ? <img className="qr" src={qrSrc} alt="QR Code WhatsApp" /> : <pre>{JSON.stringify(data.qr || data.status.evolution || {}, null, 2)}</pre>}
+          </Panel>
+        )}
 
-          <div id="agenda" className="panel">
-            <h2>Agendamentos</h2>
-            <div className="table">
-              {appointments.map((appointment) => (
-                <div className="row" key={appointment.id}>
-                  <strong>{appointment.full_name}</strong>
-                  <span>{dateLabel(appointment.starts_at)}</span>
-                  <span>{appointment.status}</span>
-                </div>
-              ))}
-              {!appointments.length && <p className="empty">Nenhum agendamento salvo.</p>}
-            </div>
-          </div>
-        </section>
+        {tab === 'clients' && <Panel title="Clientes">{data.clients.map((client) => <Line key={client.id} left={client.full_name} mid={client.phone} right={`${client.city || '-'} ${client.state || ''}`} />)}</Panel>}
 
-        <section className="grid">
-          <div id="calendario" className="panel">
-            <h2>Proximos horarios</h2>
-            <div className="slots">
-              {availability.slice(0, 12).map((slot) => <span key={slot.startsAt}>{dateLabel(slot.startsAt)}</span>)}
-              {!availability.length && <p className="empty">Sem horarios disponiveis.</p>}
-            </div>
-          </div>
+        {tab === 'appointments' && <Panel title="Agendamentos">{data.appointments.map((item) => <Line key={item.id} left={item.full_name} mid={dateLabel(item.starts_at)} right={item.status} />)}</Panel>}
 
-          <div id="config" className="panel">
-            <h2>Configuracoes</h2>
-            <dl>
-              <dt>Atendimento</dt>
-              <dd>{settings.business_hours?.start || '13:30'} ate {settings.business_hours?.end || '16:30'}</dd>
-              <dt>Antecedencia minima</dt>
-              <dd>{settings.business_hours?.minimumNoticeHours || 6} horas</dd>
-              <dt>Modelo Ollama</dt>
-              <dd>{settings.assistant?.model || 'llama3'}</dd>
-            </dl>
-          </div>
-        </section>
+        {tab === 'messages' && (
+          <Panel title="Conversas e mensagens">
+            {data.messages.map((message) => <Line key={message.id} left={`${message.direction} - ${message.phone}`} mid={message.body} right={dateLabel(message.created_at)} />)}
+          </Panel>
+        )}
 
-        <section id="status" className="panel">
-          <h2>Status dos servicos</h2>
-          <div className="status-grid">
-            {['Backend:3001', 'Dashboard:3000', 'Evolution:8080', 'n8n:5678', 'Ollama:11434', 'PostgreSQL:5432'].map((item) => (
-              <span key={item}><Activity size={16} />{item}</span>
-            ))}
-          </div>
-        </section>
+        {tab === 'faqs' && (
+          <section className="grid">
+            <Panel title="Cadastrar duvida">
+              <form className="stack" onSubmit={saveFaq}>
+                <input placeholder="Pergunta" value={faqForm.question} onChange={(event) => setFaqForm({ ...faqForm, question: event.target.value })} />
+                <textarea placeholder="Resposta" value={faqForm.answer} onChange={(event) => setFaqForm({ ...faqForm, answer: event.target.value })} />
+                <input placeholder="palavras, separadas, por virgula" value={faqForm.keywords} onChange={(event) => setFaqForm({ ...faqForm, keywords: event.target.value })} />
+                <button type="submit">Salvar FAQ</button>
+              </form>
+            </Panel>
+            <Panel title="Duvidas frequentes">{data.faqs.map((faq) => <Line key={faq.id} left={faq.question} mid={faq.answer} right={faq.active ? 'Ativa' : 'Inativa'} />)}</Panel>
+          </section>
+        )}
+
+        {tab === 'settings' && (
+          <Panel title="Configuracoes">
+            <textarea className="settings-editor" value={settingsText} onChange={(event) => setSettingsText(event.target.value)} />
+            <div className="actions"><button onClick={saveSettings}>Salvar configuracoes</button></div>
+          </Panel>
+        )}
+
+        {tab === 'status' && <Panel title="Status dos servicos"><pre>{JSON.stringify(data.status, null, 2)}</pre></Panel>}
       </section>
     </main>
   );
+}
+
+function Panel({ title, children }) {
+  return <section className="panel"><h2>{title}</h2><div className="panel-body">{children}</div></section>;
+}
+
+function Line({ left, mid, right }) {
+  return <div className="row"><strong>{left}</strong><span>{mid}</span><span>{right}</span></div>;
 }
