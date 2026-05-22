@@ -1,0 +1,11 @@
+.env
+node_modules/
+.next/
+dist/
+coverage/
+backups/
+*.log
+postgres_data/
+redis_data/
+n8n_data/
+ollama_data/

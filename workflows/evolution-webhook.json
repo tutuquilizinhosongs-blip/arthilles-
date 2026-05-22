@@ -1,0 +1,12 @@
+{
+  "name": "ArthillesBot - exemplo auxiliar",
+  "nodes": [],
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Workflow placeholder. O webhook principal fica no backend para evitar duplicidade."
+  }
+}
