@@ -4,6 +4,7 @@ node_modules/
 dist/
 coverage/
 backups/
+data/
 *.log
 postgres_data/
 redis_data/

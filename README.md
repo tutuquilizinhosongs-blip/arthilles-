@@ -50,6 +50,23 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
 O script mostra os enderecos locais e tambem os links para abrir no Android.
+Se o Docker Desktop estiver fechado, o script tenta abrir automaticamente e aguardar o Docker ficar pronto.
+
+## Instalador .exe
+
+Para gerar o instalador Windows:
+
+```powershell
+.\installer\build-installer.ps1
+```
+
+Resultado:
+
+```text
+dist\ArthillesSetup.exe
+```
+
+O instalador copia o sistema para `C:\Arthilles`, cria atalhos na area de trabalho, cria `C:\Arthilles\data` para dados persistentes, valida Docker Desktop e inicia o sistema.
 
 ## Acesso
 
