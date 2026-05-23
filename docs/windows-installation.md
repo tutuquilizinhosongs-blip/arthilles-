@@ -10,15 +10,17 @@
 ## Passos
 
 ```powershell
-git clone https://github.com/tutuquilizinhosongs-blip/arthilles.git
-cd arthilles
+git clone https://github.com/tutuquilizinhosongs-blip/arthilles-.git
+cd arthilles-
 copy .env.example .env
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\start-windows.ps1
 ```
 
 Se a execucao de scripts estiver bloqueada:
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 powershell -ExecutionPolicy Bypass -File .\scripts\start-windows.ps1
 ```
 
@@ -28,6 +30,22 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-windows.ps1
 docker compose ps
 docker exec arthilles_backend node -e "fetch('http://localhost:3001/health').then(r=>r.text()).then(console.log)"
 ```
+
+## Android na mesma rede
+
+No Windows, descubra o IP do computador:
+
+```powershell
+ipconfig
+```
+
+No celular Android, abra:
+
+```text
+http://IP-DO-PC:3000
+```
+
+No Chrome, use `Adicionar a tela inicial` para instalar como PWA.
 
 ## Portas
 

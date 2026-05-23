@@ -33,6 +33,30 @@ chmod +x scripts/*.sh
 - n8n: http://localhost:5678
 - Ollama: http://localhost:11434
 
+## Android na mesma rede
+
+Descubra o IP do computador:
+
+```bash
+hostname -I
+```
+
+No celular Android, abra:
+
+```text
+http://IP-DO-PC:3000
+```
+
+No Chrome, use `Adicionar a tela inicial`.
+
+## Validacao
+
+```bash
+docker compose config
+docker compose up -d --build
+docker compose ps
+```
+
 ## Modelo local Ollama
 
 ```bash

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import {
   Activity,
+  Ban,
   Bot,
   CalendarDays,
   Clock,
@@ -16,7 +17,16 @@ import {
   Users
 } from 'lucide-react';
 
-const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+function getBackendUrl() {
+  const configured = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+  if (typeof window === 'undefined') return configured;
+  const configuredUrl = new URL(configured);
+  const localHosts = ['localhost', '127.0.0.1', '::1'];
+  if (localHosts.includes(configuredUrl.hostname) && !localHosts.includes(window.location.hostname)) {
+    return `${window.location.protocol}//${window.location.hostname}:3001`;
+  }
+  return configured;
+}
 
 function dateLabel(value) {
   if (!value) return '-';
@@ -29,7 +39,7 @@ function dateLabel(value) {
 
 async function request(path, options = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('arthilles_token') : null;
-  const response = await fetch(`${backendUrl}${path}`, {
+  const response = await fetch(`${getBackendUrl()}${path}`, {
     ...options,
     headers: {
       'content-type': 'application/json',
@@ -64,9 +74,12 @@ export default function Dashboard() {
     conversations: [],
     faqs: [],
     status: {},
+    blocks: [],
+    logs: [],
     qr: null
   });
   const [faqForm, setFaqForm] = useState({ question: '', answer: '', keywords: '' });
+  const [blockForm, setBlockForm] = useState({ title: '', starts_at: '', ends_at: '', block_type: 'manual' });
   const [settingsText, setSettingsText] = useState('');
   const [qrSrc, setQrSrc] = useState('');
   const [error, setError] = useState('');
@@ -76,6 +89,7 @@ export default function Dashboard() {
     ['whatsapp', QrCode, 'WhatsApp'],
     ['clients', Users, 'Clientes'],
     ['appointments', CalendarDays, 'Agendamentos'],
+    ['blocks', Ban, 'Bloqueios'],
     ['messages', MessageSquare, 'Conversas'],
     ['faqs', HelpCircle, 'Duvidas'],
     ['settings', Settings, 'Configuracoes'],
@@ -84,7 +98,7 @@ export default function Dashboard() {
 
   async function loadAll() {
     setError('');
-    const [health, clients, appointments, availability, settings, messages, conversations, faqs, status] = await Promise.all([
+    const [health, clients, appointments, availability, settings, messages, conversations, faqs, status, blocks, logs] = await Promise.all([
       request('/health').catch(() => ({ ok: false })),
       request('/clients').catch(() => []),
       request('/appointments').catch(() => []),
@@ -93,9 +107,11 @@ export default function Dashboard() {
       request('/messages').catch(() => []),
       request('/conversations').catch(() => []),
       request('/faqs').catch(() => []),
-      request('/status').catch(() => ({}))
+      request('/status').catch(() => ({})),
+      request('/availability/blocks').catch(() => []),
+      request('/logs').catch(() => ({ application: [] }))
     ]);
-    setData((current) => ({ ...current, health, clients, appointments, availability, settings, messages, conversations, faqs, status }));
+    setData((current) => ({ ...current, health, clients, appointments, availability, settings, messages, conversations, faqs, status, blocks, logs: logs.application || [] }));
     setSettingsText(JSON.stringify(settings, null, 2));
   }
 
@@ -124,6 +140,12 @@ export default function Dashboard() {
       .then(setQrSrc)
       .catch(() => setQrSrc(''));
   }, [data.qr]);
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }, []);
 
   async function doLogin(event) {
     event.preventDefault();
@@ -160,6 +182,20 @@ export default function Dashboard() {
 
   async function saveSettings() {
     await request('/settings', { method: 'PUT', body: settingsText });
+    await loadAll();
+  }
+
+  async function saveBlock(event) {
+    event.preventDefault();
+    await request('/availability/block', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...blockForm,
+        starts_at: new Date(blockForm.starts_at).toISOString(),
+        ends_at: new Date(blockForm.ends_at).toISOString()
+      })
+    });
+    setBlockForm({ title: '', starts_at: '', ends_at: '', block_type: 'manual' });
     await loadAll();
   }
 
@@ -228,6 +264,25 @@ export default function Dashboard() {
 
         {tab === 'appointments' && <Panel title="Agendamentos">{data.appointments.map((item) => <Line key={item.id} left={item.full_name} mid={dateLabel(item.starts_at)} right={item.status} />)}</Panel>}
 
+        {tab === 'blocks' && (
+          <section className="grid">
+            <Panel title="Novo bloqueio">
+              <form className="stack" onSubmit={saveBlock}>
+                <input placeholder="Titulo" value={blockForm.title} onChange={(event) => setBlockForm({ ...blockForm, title: event.target.value })} />
+                <select value={blockForm.block_type} onChange={(event) => setBlockForm({ ...blockForm, block_type: event.target.value })}>
+                  <option value="manual">Manual</option>
+                  <option value="holiday">Feriado</option>
+                  <option value="vacation">Ferias/Folga</option>
+                </select>
+                <label>Inicio<input type="datetime-local" value={blockForm.starts_at} onChange={(event) => setBlockForm({ ...blockForm, starts_at: event.target.value })} /></label>
+                <label>Fim<input type="datetime-local" value={blockForm.ends_at} onChange={(event) => setBlockForm({ ...blockForm, ends_at: event.target.value })} /></label>
+                <button type="submit">Bloquear horario</button>
+              </form>
+            </Panel>
+            <Panel title="Bloqueios cadastrados">{data.blocks.map((item) => <Line key={item.id} left={item.title} mid={`${dateLabel(item.starts_at)} ate ${dateLabel(item.ends_at)}`} right={item.block_type} />)}</Panel>
+          </section>
+        )}
+
         {tab === 'messages' && (
           <Panel title="Conversas e mensagens">
             {data.messages.map((message) => <Line key={message.id} left={`${message.direction} - ${message.phone}`} mid={message.body} right={dateLabel(message.created_at)} />)}
@@ -255,7 +310,12 @@ export default function Dashboard() {
           </Panel>
         )}
 
-        {tab === 'status' && <Panel title="Status dos servicos"><pre>{JSON.stringify(data.status, null, 2)}</pre></Panel>}
+        {tab === 'status' && (
+          <section className="grid">
+            <Panel title="Status dos servicos"><pre>{JSON.stringify(data.status, null, 2)}</pre></Panel>
+            <Panel title="Logs recentes">{data.logs.map((item, index) => <Line key={`${item.time}-${index}`} left={item.type} mid={item.detail} right={dateLabel(item.time)} />)}</Panel>
+          </section>
+        )}
       </section>
     </main>
   );

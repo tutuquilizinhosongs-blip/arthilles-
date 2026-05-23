@@ -27,6 +27,17 @@ router.get('/health', async (req, res) => {
   res.json({ ok: true, service: 'arthillesbot-backend', time: new Date().toISOString() });
 });
 
+router.get('/', async (req, res) => {
+  res.json({
+    ok: true,
+    name: 'ArthillesBot Backend',
+    service: 'backend',
+    health: '/health',
+    dashboard: process.env.DASHBOARD_PUBLIC_URL || 'http://localhost:3000',
+    docs: 'Consulte o README.md para instalacao e uso.'
+  });
+});
+
 router.post('/auth/login', async (req, res) => {
   const schema = z.object({ email: z.string().email(), password: z.string().min(1) });
   const input = schema.parse(req.body);
@@ -193,6 +204,11 @@ router.get('/availability', async (req, res) => {
   res.json(slots);
 });
 
+router.get('/availability/blocks', async (req, res) => {
+  const result = await query('SELECT * FROM availability_blocks ORDER BY starts_at DESC LIMIT 200');
+  res.json(result.rows);
+});
+
 router.post('/availability/block', async (req, res) => {
   const schema = z.object({
     title: z.string().min(2),
@@ -208,6 +224,11 @@ router.post('/availability/block', async (req, res) => {
     [input.title, input.starts_at, input.ends_at, input.block_type]
   );
   res.status(201).json(result.rows[0]);
+});
+
+router.delete('/availability/block/:id', requireAdmin, async (req, res) => {
+  await query('DELETE FROM availability_blocks WHERE id = $1', [req.params.id]);
+  res.status(204).end();
 });
 
 router.get('/settings', async (req, res) => {
@@ -245,17 +266,61 @@ router.get('/evolution/qrcode', async (req, res) => {
 });
 
 router.get('/status', async (req, res) => {
+  async function checkHttp(url) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      return { ok: response.ok, status: response.status, url };
+    } catch (error) {
+      return { ok: false, url, error: error.message };
+    }
+  }
+
   const checks = await Promise.allSettled([
     query('SELECT 1'),
-    getEvolutionInstanceStatus()
+    getEvolutionInstanceStatus(),
+    checkHttp('http://n8n:5678/healthz'),
+    checkHttp(`${process.env.OLLAMA_BASE_URL || 'http://ollama:11434'}/api/tags`)
   ]);
 
   res.json({
     backend: { ok: true },
     postgres: { ok: checks[0].status === 'fulfilled' },
     evolution: checks[1].status === 'fulfilled' ? checks[1].value : { ok: false },
-    ollama: { url: process.env.OLLAMA_BASE_URL || 'http://ollama:11434', model: process.env.OLLAMA_MODEL || 'llama3' },
-    n8n: { url: 'http://localhost:5678' },
+    n8n: checks[2].status === 'fulfilled' ? checks[2].value : { ok: false, url: 'http://n8n:5678' },
+    ollama: {
+      ...(checks[3].status === 'fulfilled' ? checks[3].value : { ok: false }),
+      model: process.env.OLLAMA_MODEL || 'llama3'
+    },
     redis: { configured: Boolean(process.env.REDIS_URL) }
+  });
+});
+
+router.get('/logs', async (req, res) => {
+  const messages = await query(
+    `SELECT created_at, direction, phone, body
+     FROM messages
+     ORDER BY created_at DESC
+     LIMIT 100`
+  );
+  const sessions = await query(
+    `SELECT updated_at, phone, state
+     FROM conversation_sessions
+     ORDER BY updated_at DESC
+     LIMIT 50`
+  );
+
+  res.json({
+    application: [
+      ...messages.rows.map((row) => ({
+        time: row.created_at,
+        type: `message:${row.direction}`,
+        detail: `${row.phone} - ${row.body}`
+      })),
+      ...sessions.rows.map((row) => ({
+        time: row.updated_at,
+        type: 'session',
+        detail: `${row.phone} - ${row.state}`
+      }))
+    ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 120)
   });
 });

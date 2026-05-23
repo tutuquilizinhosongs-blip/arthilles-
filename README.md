@@ -44,9 +44,12 @@ Troque `ADMIN_EMAIL` e `ADMIN_PASSWORD` antes de uso real.
 1. Instale o Docker Desktop.
 2. Baixe ou clone este projeto.
 3. Copie `.env.example` para `.env`.
-4. Inicie os servicos:
+4. Libere a execucao de scripts nesta janela do PowerShell.
+5. Inicie os servicos:
 
 ```powershell
+copy .env.example .env
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\start-windows.ps1
 ```
 
@@ -70,9 +73,32 @@ chmod +x scripts/*.sh
 ./scripts/start-ubuntu.sh
 ```
 
+## Acesso pelo Android
+
+O Android nao roda Docker neste projeto. Ele acessa o dashboard pelo navegador usando o computador como servidor local.
+
+1. Deixe o computador e o celular na mesma rede Wi-Fi.
+2. Descubra o IP do computador:
+   - Windows: `ipconfig`
+   - Ubuntu: `hostname -I`
+3. No celular, abra:
+
+```text
+http://IP-DO-PC:3000
+```
+
+Exemplo:
+
+```text
+http://192.168.0.25:3000
+```
+
+O dashboard e responsivo e possui manifesto PWA. No Chrome do Android, use `Adicionar a tela inicial`.
+
 ## Acessos
 
 - Dashboard: http://localhost:3000
+- Dashboard status: http://localhost:3000/status
 - Backend: http://localhost:3001
 - Evolution API: http://localhost:8080
 - n8n: http://localhost:5678
@@ -90,18 +116,23 @@ O atendimento principal nao depende de API paga. Se o modelo ainda nao existir, 
 
 ## WhatsApp
 
-1. Acesse a Evolution API em http://localhost:8080.
-2. Use a chave `EVOLUTION_API_KEY` definida no `.env`.
-3. Crie ou use a instancia definida em `EVOLUTION_INSTANCE_NAME`.
-4. No dashboard, abra `WhatsApp` e clique em `Criar instancia`.
-5. Clique em `Gerar QR Code` e leia o codigo com o WhatsApp.
-6. O webhook da instancia deve apontar para:
+1. Acesse o dashboard em http://localhost:3000.
+2. Faca login.
+3. Abra a aba `WhatsApp`.
+4. Clique em `Criar instancia`.
+5. Clique em `Gerar QR Code`.
+6. Leia o QR Code com o WhatsApp.
+7. O webhook da instancia deve apontar para:
 
 ```text
 http://backend:3001/webhook/evolution
 ```
 
 O backend tambem tenta configurar esse webhook ao iniciar.
+
+## n8n
+
+O n8n e opcional para automacoes auxiliares. Na primeira abertura em http://localhost:5678 ele pode pedir criacao de usuario inicial. Isso e normal do n8n e nao interfere no fluxo principal do WhatsApp, que fica no backend.
 
 ## Teste rapido
 
@@ -132,6 +163,7 @@ O bot inicia o cadastro, coleta dados do cliente, mostra horarios disponiveis e 
 - `POST /appointments`
 - `GET /availability`
 - `POST /availability/block`
+- `GET /availability/blocks`
 - `GET /settings`
 - `PUT /settings`
 - `POST /auth/login`
@@ -143,6 +175,7 @@ O bot inicia o cadastro, coleta dados do cliente, mostra horarios disponiveis e 
 - `GET /evolution/status`
 - `POST /evolution/instance`
 - `GET /status`
+- `GET /logs`
 
 ## Scripts Windows
 
@@ -172,6 +205,23 @@ Ubuntu:
 ./scripts/stop-ubuntu.sh
 ./scripts/logs-ubuntu.sh
 ./scripts/backup-ubuntu.sh
+```
+
+## Validacao
+
+Depois da instalacao, valide:
+
+```powershell
+docker compose config
+docker compose up -d --build
+docker compose ps
+```
+
+O backend tambem deve responder em:
+
+```text
+http://localhost:3001/
+http://localhost:3001/health
 ```
 
 ## Estrutura
