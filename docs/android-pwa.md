@@ -35,3 +35,7 @@ No Chrome Android:
 3. Selecione `Adicionar a tela inicial`.
 
 O dashboard inclui manifesto PWA e layout responsivo.
+
+## Tela De Ajuda No Painel
+
+O dashboard possui a aba `Android/PWA`, que mostra os enderecos provaveis para abrir no celular.

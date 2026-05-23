@@ -1,51 +1,47 @@
 # ArthillesBot
 
-ArthillesBot e uma plataforma local de atendimento WhatsApp para pequenas empresas. O sistema roda no Windows com Docker Desktop e combina Evolution API, backend Node.js, PostgreSQL, Redis, dashboard Next.js, n8n auxiliar e IA local gratuita com Ollama.
+ArthillesBot e um sistema white-label local para pequenas empresas fazerem atendimento automatico no WhatsApp, cadastro de clientes, agendamentos, FAQ e acompanhamento pelo painel.
 
-O objetivo e oferecer uma base simples de instalar e pronta para evoluir como produto SaaS local: atendimento automatico, CRM, agendamento, dashboard administrativo e respostas assistidas por modelo open source.
+O computador Windows do cliente funciona como servidor local. O celular Android acessa o painel pelo navegador/PWA na mesma rede, sem instalar Docker no Android.
 
 ## Arquitetura
 
 ```text
-WhatsApp
+Windows do cliente
+  -> Docker Compose
   -> Evolution API
-  -> Webhook unico do backend
-  -> Backend Node.js/Express
+  -> Backend Node.js
   -> PostgreSQL
-  -> Dashboard Next.js
+  -> Dashboard Next.js PWA
+  -> Google Sheets para FAQ
+  -> Ollama opcional para IA local
 
-Redis: cache e suporte de infraestrutura
-n8n: orquestracao auxiliar, sem duplicar a regra principal
-Ollama: IA local gratuita
+Android
+  -> Navegador/PWA
+  -> http://IP-DO-COMPUTADOR:3000
 ```
 
-## Stack
+n8n nao e obrigatorio. Ele fica disponivel apenas como opcional para automacoes futuras.
 
-- Docker Compose
-- Evolution API
-- n8n
-- PostgreSQL
-- Redis
-- Backend Node.js/Express
-- Dashboard Next.js
-- Ollama com modelo `llama3` por padrao
+## O Que O Cliente Consegue Fazer
 
-## Login do painel
+- Entrar no painel com login local.
+- Personalizar nome da empresa, logo, cores e mensagem inicial.
+- Conectar WhatsApp por QR Code usando Evolution API.
+- Responder duvidas por FAQ local ou Google Sheets.
+- Usar Ollama como IA local opcional, sem OpenAI paga.
+- Cadastrar clientes automaticamente.
+- Agendar reunioes automaticamente.
+- Bloquear feriados, viagens, folgas e horarios indisponiveis.
+- Ver clientes, conversas, agendamentos, logs e status.
+- Acessar pelo Android na mesma rede como PWA.
 
-Credenciais iniciais configuradas no `.env.example`:
-
-- Email: `admin@arthilles.local`
-- Senha: `admin123`
-
-Troque `ADMIN_EMAIL` e `ADMIN_PASSWORD` antes de uso real.
-
-## Instalacao no Windows
+## Instalacao Windows
 
 1. Instale o Docker Desktop.
-2. Baixe ou clone este projeto.
-3. Copie `.env.example` para `.env`.
-4. Libere a execucao de scripts nesta janela do PowerShell.
-5. Inicie os servicos:
+2. Baixe ou clone este repositorio.
+3. Abra o PowerShell na pasta do projeto.
+4. Rode:
 
 ```powershell
 copy .env.example .env
@@ -53,163 +49,130 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\start-windows.ps1
 ```
 
-Se o Windows bloquear scripts PowerShell:
+O script mostra os enderecos locais e tambem os links para abrir no Android.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-windows.ps1
-```
-
-Comando manual equivalente:
-
-```powershell
-docker compose up -d --build
-```
-
-## Instalacao no Ubuntu
-
-```bash
-cp .env.example .env
-chmod +x scripts/*.sh
-./scripts/start-ubuntu.sh
-```
-
-## Acesso pelo Android
-
-O Android nao roda Docker neste projeto. Ele acessa o dashboard pelo navegador usando o computador como servidor local.
-
-1. Deixe o computador e o celular na mesma rede Wi-Fi.
-2. Descubra o IP do computador:
-   - Windows: `ipconfig`
-   - Ubuntu: `hostname -I`
-3. No celular, abra:
-
-```text
-http://IP-DO-PC:3000
-```
-
-Exemplo:
-
-```text
-http://192.168.0.25:3000
-```
-
-O dashboard e responsivo e possui manifesto PWA. No Chrome do Android, use `Adicionar a tela inicial`.
-
-## Acessos
+## Acesso
 
 - Dashboard: http://localhost:3000
-- Dashboard status: http://localhost:3000/status
+- Status do dashboard: http://localhost:3000/status
 - Backend: http://localhost:3001
 - Evolution API: http://localhost:8080
-- n8n: http://localhost:5678
 - Ollama: http://localhost:11434
 
-## IA local
+No Android, use:
 
-Baixe o modelo padrao depois que o container subir:
-
-```powershell
-docker exec -it arthilles_ollama ollama pull llama3
+```text
+http://IP-DO-COMPUTADOR:3000
 ```
 
-O atendimento principal nao depende de API paga. Se o modelo ainda nao existir, o backend usa respostas deterministicas para cadastro e agenda.
+O IP aparece ao rodar `scripts/start-windows.ps1`. Tambem pode ser encontrado com:
+
+```powershell
+ipconfig
+```
+
+## Login Inicial
+
+As credenciais iniciais ficam no `.env`:
+
+```text
+ADMIN_EMAIL=admin@arthilles.local
+ADMIN_PASSWORD=admin123
+```
+
+Troque antes de entregar para um cliente.
 
 ## WhatsApp
 
-1. Acesse o dashboard em http://localhost:3000.
+1. Acesse o dashboard.
 2. Faca login.
 3. Abra a aba `WhatsApp`.
 4. Clique em `Criar instancia`.
 5. Clique em `Gerar QR Code`.
 6. Leia o QR Code com o WhatsApp.
-7. O webhook da instancia deve apontar para:
+
+O webhook principal fica no backend:
 
 ```text
 http://backend:3001/webhook/evolution
 ```
 
-O backend tambem tenta configurar esse webhook ao iniciar.
+## White-label
 
-## n8n
+No painel, abra `Configuracoes` para editar:
 
-O n8n e opcional para automacoes auxiliares. Na primeira abertura em http://localhost:5678 ele pode pedir criacao de usuario inicial. Isso e normal do n8n e nao interfere no fluxo principal do WhatsApp, que fica no backend.
+- Nome da empresa
+- URL da logo
+- Cor principal
+- Cor de destaque
+- Horario de atendimento
+- Antecedencia minima
+- Mensagem inicial do WhatsApp
+- Ativar/desativar Ollama
+- Google Sheets para FAQ
 
-## Teste rapido
+## FAQ Com Google Sheets
 
-Com o WhatsApp conectado, envie:
+Crie uma planilha publica com as colunas:
 
 ```text
-oi
+pergunta,resposta,palavras
 ```
 
-O bot inicia o cadastro, coleta dados do cliente, mostra horarios disponiveis e agenda quando o usuario escolhe um horario.
+Publique ou exporte como CSV e cole o link na tela `Configuracoes`.
 
-## Regras de agenda
+Exemplo de cabecalho:
 
-- Atendimento de segunda a sexta.
-- Horario padrao de 13:30 ate 16:30.
-- Reunioes de 1 hora.
-- Bloqueio automatico para horarios com menos de 6 horas de antecedencia.
-- Horarios ocupados nao aparecem.
-- Ferias, feriados e bloqueios manuais usam `availability_blocks`.
+```csv
+pergunta,resposta,palavras
+Como funciona?,Atendemos pelo WhatsApp e agendamos uma reuniao.,atendimento;agenda
+```
 
-## Endpoints
+## Ollama Opcional
 
-- `GET /health`
-- `POST /webhook/evolution`
-- `GET /clients`
-- `POST /clients`
-- `GET /appointments`
-- `POST /appointments`
-- `GET /availability`
-- `POST /availability/block`
-- `GET /availability/blocks`
-- `GET /settings`
-- `PUT /settings`
-- `POST /auth/login`
-- `GET /messages`
-- `GET /conversations`
-- `GET /faqs`
-- `POST /faqs`
-- `GET /evolution/qrcode`
-- `GET /evolution/status`
-- `POST /evolution/instance`
-- `GET /status`
-- `GET /logs`
-
-## Scripts Windows
+O sistema funciona sem modelo baixado. Para usar IA local:
 
 ```powershell
-.\scripts\start-windows.ps1
-.\scripts\stop-windows.ps1
-.\scripts\logs-windows.ps1
+docker exec -it arthilles_ollama ollama pull llama3
+```
+
+Sem OpenAI paga e sem API paga.
+
+## n8n Opcional
+
+n8n nao sobe no fluxo padrao. Para habilitar quando quiser:
+
+```powershell
+docker compose --profile optional up -d n8n
+```
+
+Depois acesse:
+
+```text
+http://localhost:5678
+```
+
+## Backup
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\backup-windows.ps1
 ```
 
-Logs de um servico especifico:
+## Logs
 
 ```powershell
+.\scripts\logs-windows.ps1
 .\scripts\logs-windows.ps1 backend
 ```
 
-Backup com fallback de politica de execucao:
+## Parar
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\backup-windows.ps1
+.\scripts\stop-windows.ps1
 ```
 
-Ubuntu:
-
-```bash
-./scripts/start-ubuntu.sh
-./scripts/stop-ubuntu.sh
-./scripts/logs-ubuntu.sh
-./scripts/backup-ubuntu.sh
-```
-
-## Validacao
-
-Depois da instalacao, valide:
+## Validacao Tecnica
 
 ```powershell
 docker compose config
@@ -217,42 +180,24 @@ docker compose up -d --build
 docker compose ps
 ```
 
-O backend tambem deve responder em:
+Endpoints importantes:
 
-```text
-http://localhost:3001/
-http://localhost:3001/health
+- `GET /`
+- `GET /health`
+- `GET /status`
+- `GET /network`
+- `POST /webhook/evolution`
+- `GET /availability`
+- `GET /availability/blocks`
+- `GET /faqs`
+- `GET /faqs/google-sheets/preview`
+
+## Ubuntu
+
+Ubuntu nao e prioridade do produto white-label, mas os scripts continuam disponiveis para uso tecnico:
+
+```bash
+cp .env.example .env
+chmod +x scripts/*.sh
+./scripts/start-ubuntu.sh
 ```
-
-## Estrutura
-
-```text
-arthilles/
-|-- backend/
-|-- dashboard/
-|-- database/
-|-- docker/
-|-- docs/
-|-- n8n/
-|-- ollama/
-|-- scripts/
-|-- workflows/
-|-- .env.example
-|-- docker-compose.yml
-`-- README.md
-```
-
-## Bancos internos
-
-Todos usam o mesmo container PostgreSQL, mas com bancos separados para evitar conflito de migrations:
-
-- `arthillesbot`: dados do produto
-- `arthilles_evolution`: Evolution API
-- `arthilles_n8n`: n8n
-
-## Seguranca
-
-- Troque todas as senhas do `.env` antes de uso real.
-- Nunca publique `.env`.
-- O projeto nao exige OpenAI, APIs pagas, SQLite ou servicos externos obrigatorios.
-- Em producao, revise exposicao de portas, senhas, backups e logs.

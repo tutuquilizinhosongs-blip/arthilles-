@@ -106,6 +106,14 @@ pre {
   align-items: center;
 }
 
+.brand img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #fff;
+}
+
 .brand strong, .brand span {
   display: block;
 }
@@ -240,6 +248,32 @@ nav button.active, nav button:hover, .ghost:hover {
   gap: 10px;
 }
 
+.two-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.check-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.check-row input {
+  width: auto;
+}
+
+.copy-box {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fafb;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .settings-editor {
   min-height: 430px;
   font-family: Consolas, monospace;
@@ -286,6 +320,10 @@ nav button.active, nav button:hover, .ghost:hover {
 
   .topbar, .row {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .two-cols {
     grid-template-columns: 1fr;
   }
 }

@@ -41,7 +41,9 @@ export async function ensureApplicationSchema() {
 
     INSERT INTO settings (key, value) VALUES
     ('whatsapp', '{"instance":"arthilles","connected":false}'::jsonb),
-    ('faq', '{"enabled":true,"preferFaq":true}'::jsonb)
+    ('faq', '{"enabled":true,"preferFaq":true}'::jsonb),
+    ('theme', '{"primaryColor":"#176b87","accentColor":"#2f7d32","logoUrl":""}'::jsonb),
+    ('google_sheets', '{"enabled":false,"csvUrl":"","instructions":"Use uma planilha publica com colunas pergunta,resposta,palavras."}'::jsonb)
     ON CONFLICT (key) DO NOTHING;
 
     INSERT INTO faq_items (question, answer, keywords) VALUES

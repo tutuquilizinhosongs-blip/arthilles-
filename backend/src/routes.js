@@ -1,10 +1,12 @@
 import express from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
+import os from 'os';
 import { query, getSettingsMap } from './db.js';
 import { getAvailableSlots } from './availability.js';
 import { handleConversation } from './conversation.js';
 import { sendWhatsAppText, getEvolutionInstanceStatus, getEvolutionQrCode, configureEvolutionWebhook, createEvolutionInstance } from './evolution.js';
+import { fetchGoogleSheetFaqs } from './googleSheets.js';
 
 export const router = express.Router();
 
@@ -25,6 +27,21 @@ function requireAdmin(req, res, next) {
 router.get('/health', async (req, res) => {
   await query('SELECT 1');
   res.json({ ok: true, service: 'arthillesbot-backend', time: new Date().toISOString() });
+});
+
+router.get('/network', (req, res) => {
+  const addresses = Object.values(os.networkInterfaces())
+    .flat()
+    .filter((item) => item && item.family === 'IPv4' && !item.internal)
+    .map((item) => item.address);
+  const host = req.headers.host?.split(':')[0] || 'localhost';
+
+  res.json({
+    host,
+    addresses,
+    dashboardUrls: addresses.map((address) => `http://${address}:${process.env.DASHBOARD_PORT || 3000}`),
+    note: 'Se a lista mostrar apenas IPs internos do Docker, use ipconfig no Windows para encontrar o IPv4 do computador.'
+  });
 });
 
 router.get('/', async (req, res) => {
@@ -99,6 +116,12 @@ router.get('/conversations', async (req, res) => {
 router.get('/faqs', async (req, res) => {
   const result = await query('SELECT * FROM faq_items ORDER BY created_at DESC');
   res.json(result.rows);
+});
+
+router.get('/faqs/google-sheets/preview', async (req, res) => {
+  const settings = await getSettingsMap();
+  const rows = await fetchGoogleSheetFaqs(settings);
+  res.json({ ok: true, count: rows.length, rows: rows.slice(0, 20) });
 });
 
 router.post('/faqs', requireAdmin, async (req, res) => {
@@ -278,17 +301,18 @@ router.get('/status', async (req, res) => {
   const checks = await Promise.allSettled([
     query('SELECT 1'),
     getEvolutionInstanceStatus(),
-    checkHttp('http://n8n:5678/healthz'),
     checkHttp(`${process.env.OLLAMA_BASE_URL || 'http://ollama:11434'}/api/tags`)
   ]);
+  const n8nEnabled = process.env.N8N_ENABLED === 'true';
+  const n8nStatus = n8nEnabled ? await checkHttp('http://n8n:5678/healthz') : { ok: true, optional: true, enabled: false, message: 'n8n opcional e desativado no fluxo padrao.' };
 
   res.json({
     backend: { ok: true },
     postgres: { ok: checks[0].status === 'fulfilled' },
     evolution: checks[1].status === 'fulfilled' ? checks[1].value : { ok: false },
-    n8n: checks[2].status === 'fulfilled' ? checks[2].value : { ok: false, url: 'http://n8n:5678' },
+    n8n: n8nStatus,
     ollama: {
-      ...(checks[3].status === 'fulfilled' ? checks[3].value : { ok: false }),
+      ...(checks[2].status === 'fulfilled' ? checks[2].value : { ok: false }),
       model: process.env.OLLAMA_MODEL || 'llama3'
     },
     redis: { configured: Boolean(process.env.REDIS_URL) }

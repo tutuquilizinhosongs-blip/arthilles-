@@ -87,9 +87,11 @@ CREATE TABLE IF NOT EXISTS admin_users (
 INSERT INTO settings (key, value) VALUES
 ('business_hours', '{"days":[1,2,3,4,5],"start":"13:30","end":"16:30","slotMinutes":60,"minimumNoticeHours":6}'::jsonb),
 ('assistant', '{"model":"llama3","enabled":true,"fallbackMessage":"Obrigado pela mensagem. Vou te ajudar com o cadastro e agendamento."}'::jsonb),
-('company', '{"name":"Arthilles","timezone":"America/Sao_Paulo"}'::jsonb),
+('company', '{"name":"Arthilles","timezone":"America/Sao_Paulo","welcomeMessage":"Ola! Sou o assistente virtual. Vou te ajudar com atendimento e agendamento."}'::jsonb),
 ('whatsapp', '{"instance":"arthilles","connected":false}'::jsonb),
-('faq', '{"enabled":true,"preferFaq":true}'::jsonb)
+('faq', '{"enabled":true,"preferFaq":true}'::jsonb),
+('theme', '{"primaryColor":"#176b87","accentColor":"#2f7d32","logoUrl":""}'::jsonb),
+('google_sheets', '{"enabled":false,"csvUrl":"","instructions":"Use uma planilha publica com colunas pergunta,resposta,palavras."}'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO faq_items (question, answer, keywords) VALUES

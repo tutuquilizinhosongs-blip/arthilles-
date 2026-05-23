@@ -1,13 +1,14 @@
-import { query } from './db.js';
+import { query, getSettingsMap } from './db.js';
 import { getAvailableSlots } from './availability.js';
 import { askLocalAssistant } from './ollama.js';
+import { fetchGoogleSheetFaqs } from './googleSheets.js';
 
 const fields = [
   ['full_name', 'Qual e o seu nome completo?'],
   ['email', 'Qual e o seu email?'],
   ['company_type', 'Qual e o tipo da sua empresa?'],
   ['city_state', 'Qual e sua cidade e estado?'],
-  ['main_problem', 'Qual e o principal problema que voce quer resolver?']
+  ['main_problem', 'Qual e a principal necessidade que voce quer resolver?']
 ];
 
 function normalizePhone(phone) {
@@ -70,12 +71,18 @@ function formatSlots(slots) {
   ].join('\n');
 }
 
+function normalizeText(message) {
+  return String(message || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
 function wantsScheduling(message) {
-  return /\b(agenda|agendar|reuniao|reunião|marcar|horario|horário|consulta|call)\b/i.test(message);
+  return /\b(agenda|agendar|reuniao|marcar|horario|consulta|call)\b/i.test(normalizeText(message));
 }
 
 async function findFaqAnswer(message) {
-  const terms = message.toLowerCase().split(/\s+/).filter((term) => term.length > 2);
+  const terms = normalizeText(message).split(/\s+/).filter((term) => term.length > 2);
+  const settings = await getSettingsMap();
+  const sheetFaqs = await fetchGoogleSheetFaqs(settings).catch(() => []);
   const result = await query(
     `SELECT question, answer, keywords
      FROM faq_items
@@ -83,8 +90,8 @@ async function findFaqAnswer(message) {
      ORDER BY updated_at DESC`
   );
 
-  for (const item of result.rows) {
-    const haystack = `${item.question} ${(item.keywords || []).join(' ')}`.toLowerCase();
+  for (const item of [...sheetFaqs, ...result.rows]) {
+    const haystack = normalizeText(`${item.question} ${(item.keywords || []).join(' ')}`);
     if (terms.some((term) => haystack.includes(term))) return item.answer;
   }
 
@@ -101,19 +108,22 @@ export async function handleConversation({ phone: rawPhone, body }) {
 
   const session = await getSession(phone);
   const data = session.data || {};
+  const settings = await getSettingsMap();
+  const company = settings.company || {};
   let reply;
 
-  if (['oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite', 'inicio', 'início'].includes(cleanBody.toLowerCase())) {
+  if (['oi', 'ola', 'bom dia', 'boa tarde', 'boa noite', 'inicio'].includes(normalizeText(cleanBody))) {
     await updateSession(phone, 'collecting', {});
-    reply = `Ola! Sou o ArthillesBot. Vou fazer seu cadastro rapido para encontrar um horario.\n${fields[0][1]}`;
+    reply = `${company.welcomeMessage || 'Ola! Vou fazer seu cadastro rapido para encontrar um horario.'}\n${fields[0][1]}`;
   } else if (session.state === 'greeting' && wantsScheduling(cleanBody)) {
     await updateSession(phone, 'collecting', {});
     reply = `Claro. Vou coletar seus dados para agendar.\n${fields[0][1]}`;
   } else if (session.state === 'greeting') {
     const faq = await findFaqAnswer(cleanBody);
-    const ai = faq || await askLocalAssistant({ state: session.state, faqMatched: Boolean(faq) }, cleanBody);
+    const assistantEnabled = settings.assistant?.enabled !== false;
+    const ai = faq || (assistantEnabled ? await askLocalAssistant({ state: session.state, faqMatched: Boolean(faq) }, cleanBody) : null);
     reply = ai || 'Posso responder duvidas ou agendar uma reuniao. Para comecar um agendamento, envie "agendar".';
-  } else if (session.state === 'collecting' || session.state === 'greeting') {
+  } else if (session.state === 'collecting') {
     const nextField = fields.find(([key]) => !data[key]);
     if (nextField && cleanBody) {
       data[nextField[0]] = cleanBody;
@@ -134,8 +144,7 @@ export async function handleConversation({ phone: rawPhone, body }) {
     const index = Number(cleanBody) - 1;
     const selected = data.availableSlots?.[index];
     if (!selected) {
-      const ai = await askLocalAssistant({ state: session.state }, cleanBody);
-      reply = ai || 'Responda com o numero de um horario da lista para agendar.';
+      reply = 'Responda com o numero de um horario da lista para agendar.';
     } else {
       const result = await query(
         `INSERT INTO appointments (client_id, starts_at, ends_at, status)
@@ -152,7 +161,8 @@ export async function handleConversation({ phone: rawPhone, body }) {
       reply = `Agendamento confirmado para ${date}. Obrigado!`;
     }
   } else {
-    const ai = await askLocalAssistant({ state: session.state }, cleanBody);
+    const faq = await findFaqAnswer(cleanBody);
+    const ai = faq || (settings.assistant?.enabled !== false ? await askLocalAssistant({ state: session.state }, cleanBody) : null);
     reply = ai || 'Seu atendimento ja esta registrado. Para iniciar novamente, envie "oi".';
   }
 

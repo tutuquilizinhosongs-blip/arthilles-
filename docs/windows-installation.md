@@ -1,17 +1,14 @@
-# Instalacao Windows
+# Instalacao Windows Para Cliente
 
 ## Requisitos
 
 - Windows 10 ou 11
 - Docker Desktop instalado e aberto
-- Git instalado
 - PowerShell
 
 ## Passos
 
 ```powershell
-git clone https://github.com/tutuquilizinhosongs-blip/arthilles-.git
-cd arthilles-
 copy .env.example .env
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\start-windows.ps1
@@ -33,7 +30,7 @@ docker exec arthilles_backend node -e "fetch('http://localhost:3001/health').the
 
 ## Android na mesma rede
 
-No Windows, descubra o IP do computador:
+O script de inicio mostra o link para abrir no celular. Se precisar descobrir manualmente:
 
 ```powershell
 ipconfig
@@ -46,6 +43,10 @@ http://IP-DO-PC:3000
 ```
 
 No Chrome, use `Adicionar a tela inicial` para instalar como PWA.
+
+## Personalizacao
+
+No dashboard, abra `Configuracoes` para alterar nome da empresa, logo, cores, horarios, mensagem inicial e Google Sheets de FAQ.
 
 ## Portas
 

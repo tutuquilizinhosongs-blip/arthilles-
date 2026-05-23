@@ -57,3 +57,11 @@ Telas disponiveis:
 - Duvidas frequentes
 - Configuracoes
 - Status
+
+## n8n
+
+n8n esta em profile opcional no Docker Compose. O fluxo principal nao depende dele.
+
+```powershell
+docker compose --profile optional up -d n8n
+```

@@ -15,5 +15,10 @@ echo "ArthillesBot iniciado."
 echo "Dashboard:     http://localhost:3000"
 echo "Backend:       http://localhost:3001"
 echo "Evolution API: http://localhost:8080"
-echo "n8n:           http://localhost:5678"
+echo "n8n opcional:  docker compose --profile optional up -d n8n"
 echo "Ollama:        http://localhost:11434"
+echo ""
+echo "Acesso pelo Android na mesma rede:"
+hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.' | while read -r ip; do
+  echo "Dashboard:     http://${ip}:3000"
+done

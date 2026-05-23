@@ -51,6 +51,7 @@ services:
       EVOLUTION_INSTANCE_NAME: ${EVOLUTION_INSTANCE_NAME}
       EVOLUTION_BASE_URL: http://evolution-api:8080
       EVOLUTION_WEBHOOK_URL: ${EVOLUTION_WEBHOOK_URL}
+      N8N_ENABLED: ${N8N_ENABLED:-false}
     ports:
       - "${BACKEND_PORT}:3001"
     depends_on:
@@ -111,6 +112,8 @@ services:
   n8n:
     image: n8nio/n8n:latest
     container_name: arthilles_n8n
+    profiles:
+      - optional
     restart: unless-stopped
     env_file:
       - .env
