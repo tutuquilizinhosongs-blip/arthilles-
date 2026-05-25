@@ -1,4 +1,7 @@
 .env
+.env.local
+backend/.env
+dashboard/.env.local
 node_modules/
 .next/
 dist/
@@ -6,7 +9,5 @@ coverage/
 backups/
 data/
 *.log
-postgres_data/
-redis_data/
-n8n_data/
-ollama_data/
+.vercel/
+.railway/

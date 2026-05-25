@@ -1,67 +1,74 @@
 # Desenvolvimento
 
-## Fluxo local
+## Requisitos
 
-```powershell
-copy .env.example .env
-docker compose up -d --build
-docker compose ps
-```
+- Node.js 20+
+- Conta Supabase
+- Evolution API acessivel pela internet para testar WhatsApp real
+- Chave OpenRouter para respostas com IA
 
 ## Backend
 
-O backend centraliza webhook, CRM, agenda, disponibilidade e integracao com Ollama.
+```powershell
+cd backend
+copy .env.example .env
+npm install
+npm run dev
+```
 
 Principais arquivos:
 
-- `backend/src/server.js`
-- `backend/src/routes.js`
-- `backend/src/conversation.js`
-- `backend/src/availability.js`
+- `src/server.js`: Express e CORS
+- `src/routes.js`: endpoints HTTP
+- `src/conversation.js`: fluxo WhatsApp, FAQ e agenda
+- `src/availability.js`: regras de horario e bloqueios
+- `src/evolution.js`: QR Code, webhook e envio de mensagens
+- `src/openrouter.js`: chamada de IA
+- `src/db.js`: cliente Supabase e mapeamento de configuracoes
 
 ## Dashboard
 
-O dashboard Next.js consome o backend por `BACKEND_INTERNAL_URL` dentro do Docker e por `NEXT_PUBLIC_BACKEND_URL` no navegador.
+```powershell
+cd dashboard
+copy .env.example .env.local
+npm install
+npm run dev
+```
+
+Defina `NEXT_PUBLIC_BACKEND_URL=http://localhost:3001` para desenvolvimento.
 
 ## Banco
 
-Schema principal:
+Execute `supabase/schema.sql` no SQL Editor do Supabase.
 
+Tabelas principais:
+
+- `companies`
+- `app_users`
 - `clients`
 - `appointments`
 - `availability_blocks`
 - `messages`
 - `conversation_sessions`
-- `settings`
+- `faq_items`
 
-As migrations iniciais ficam em `database/init`.
+## Variaveis Importantes
 
-## Commits sugeridos
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `AUTH_SECRET`
+- `DEFAULT_COMPANY_ID`
+- `OPENROUTER_API_KEY`
+- `BACKEND_PUBLIC_URL`
+- `DASHBOARD_PUBLIC_URL`
+- `NEXT_PUBLIC_BACKEND_URL`
 
-- `feat: add backend conversation flow`
-- `feat: add dashboard overview`
-- `chore: configure docker compose`
-- `docs: update windows installation guide`
+## Testes Manuais
 
-## Dashboard
-
-O painel possui login local usando `ADMIN_EMAIL` e `ADMIN_PASSWORD`. O token gerado pelo backend e salvo no `localStorage` do navegador.
-
-Telas disponiveis:
-
-- Visao geral
-- WhatsApp / QR Code
-- Clientes
-- Agendamentos
-- Conversas
-- Duvidas frequentes
-- Configuracoes
-- Status
-
-## n8n
-
-n8n esta em profile opcional no Docker Compose. O fluxo principal nao depende dele.
-
-```powershell
-docker compose --profile optional up -d n8n
-```
+1. `GET /health`
+2. Login pelo dashboard
+3. `GET /status`
+4. Configurar Evolution API no painel
+5. Criar instancia e gerar QR Code
+6. Enviar `oi` para o WhatsApp conectado
+7. Enviar `agendar` e concluir o fluxo

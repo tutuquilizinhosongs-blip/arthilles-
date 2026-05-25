@@ -1,108 +1,121 @@
 import axios from 'axios';
 import { logger } from './logger.js';
 
-const baseURL = process.env.EVOLUTION_BASE_URL || 'http://evolution-api:8080';
-const apiKey = process.env.EVOLUTION_API_KEY;
-const instance = process.env.EVOLUTION_INSTANCE_NAME || 'arthilles';
+function configForCompany(company = {}) {
+  return {
+    baseURL: company.evolution_base_url || process.env.EVOLUTION_BASE_URL,
+    apiKey: company.evolution_api_key || process.env.EVOLUTION_API_KEY,
+    instance: company.evolution_instance_name || process.env.EVOLUTION_INSTANCE_NAME || 'arthilles'
+  };
+}
 
-export async function sendWhatsAppText(phone, text) {
-  if (!apiKey) {
-    logger.warn({ phone }, 'Evolution API key not configured; skipping outbound WhatsApp message');
-    return;
+function headers(apiKey) {
+  return { apikey: apiKey };
+}
+
+export async function sendWhatsAppText(company, phone, text) {
+  const config = configForCompany(company);
+  if (!config.baseURL || !config.apiKey) {
+    logger.warn({ phone }, 'Evolution API not configured; outbound message skipped');
+    return { ok: false, skipped: true };
   }
 
   try {
-    await axios.post(
-      `${baseURL}/message/sendText/${instance}`,
+    const response = await axios.post(
+      `${config.baseURL}/message/sendText/${config.instance}`,
       { number: phone, text },
-      { headers: { apikey: apiKey }, timeout: 15000 }
+      { headers: headers(config.apiKey), timeout: 15000 }
     );
+    return { ok: true, data: response.data };
   } catch (error) {
-    logger.error({ err: error.message, phone }, 'Failed to send WhatsApp message through Evolution API');
+    logger.error({ err: error.response?.data || error.message, phone }, 'Evolution sendText failed');
+    return { ok: false, error: error.response?.data || error.message };
   }
 }
 
-export async function configureEvolutionWebhook() {
-  const webhookUrl = process.env.EVOLUTION_WEBHOOK_URL;
-  if (!apiKey || !webhookUrl) return;
+export async function configureEvolutionWebhook(company) {
+  const config = configForCompany(company);
+  const publicUrl = process.env.BACKEND_PUBLIC_URL;
+  if (!config.baseURL || !config.apiKey || !publicUrl || !company?.id) {
+    return { ok: false, skipped: true, error: 'Evolution ou BACKEND_PUBLIC_URL nao configurados' };
+  }
 
+  const webhookUrl = `${publicUrl.replace(/\/$/, '')}/webhook/evolution?companyId=${company.id}`;
   try {
-    await axios.post(
-      `${baseURL}/webhook/set/${instance}`,
+    const response = await axios.post(
+      `${config.baseURL}/webhook/set/${config.instance}`,
       {
         enabled: true,
         url: webhookUrl,
         webhookByEvents: false,
         events: ['MESSAGES_UPSERT']
       },
-      { headers: { apikey: apiKey }, timeout: 15000 }
+      { headers: headers(config.apiKey), timeout: 15000 }
     );
-    logger.info({ webhookUrl }, 'Evolution webhook configured');
+    return { ok: true, instance: config.instance, webhookUrl, data: response.data };
   } catch (error) {
-    logger.warn({ err: error.message }, 'Could not auto-configure Evolution webhook yet');
+    return { ok: false, instance: config.instance, webhookUrl, error: error.response?.data || error.message };
   }
 }
 
-export async function getEvolutionInstanceStatus() {
-  if (!apiKey) return { ok: false, error: 'Evolution API key not configured' };
+export async function getEvolutionInstanceStatus(company) {
+  const config = configForCompany(company);
+  if (!config.baseURL || !config.apiKey) return { ok: false, error: 'Evolution API nao configurada' };
 
   try {
-    const response = await axios.get(`${baseURL}/instance/connectionState/${instance}`, {
-      headers: { apikey: apiKey },
+    const response = await axios.get(`${config.baseURL}/instance/connectionState/${config.instance}`, {
+      headers: headers(config.apiKey),
       timeout: 10000
     });
-    return { ok: true, instance, data: response.data };
+    return { ok: true, instance: config.instance, data: response.data };
   } catch (error) {
-    return { ok: false, instance, error: error.response?.data || error.message };
+    return { ok: false, instance: config.instance, error: error.response?.data || error.message };
   }
 }
 
-export async function createEvolutionInstance() {
-  if (!apiKey) return { ok: false, error: 'Evolution API key not configured' };
+export async function createEvolutionInstance(company) {
+  const config = configForCompany(company);
+  if (!config.baseURL || !config.apiKey) return { ok: false, error: 'Evolution API nao configurada' };
 
   try {
     const response = await axios.post(
-      `${baseURL}/instance/create`,
+      `${config.baseURL}/instance/create`,
       {
-        instanceName: instance,
+        instanceName: config.instance,
         qrcode: true,
         integration: 'WHATSAPP-BAILEYS'
       },
-      { headers: { apikey: apiKey }, timeout: 20000 }
+      { headers: headers(config.apiKey), timeout: 20000 }
     );
-    await configureEvolutionWebhook();
-    return { ok: true, instance, data: response.data };
+    const webhook = await configureEvolutionWebhook(company);
+    return { ok: true, instance: config.instance, webhook, data: response.data };
   } catch (error) {
     const message = error.response?.data || error.message;
     if (JSON.stringify(message).toLowerCase().includes('already')) {
-      return { ok: true, instance, data: message };
+      return { ok: true, instance: config.instance, data: message };
     }
-    return { ok: false, instance, error: message };
+    return { ok: false, instance: config.instance, error: message };
   }
 }
 
-export async function getEvolutionQrCode() {
-  if (!apiKey) return { ok: false, error: 'Evolution API key not configured' };
+export async function getEvolutionQrCode(company) {
+  const config = configForCompany(company);
+  if (!config.baseURL || !config.apiKey) return { ok: false, error: 'Evolution API nao configurada' };
 
-  const status = await getEvolutionInstanceStatus();
-  if (!status.ok && JSON.stringify(status.error).includes('does not exist')) {
-    await createEvolutionInstance();
-  }
-
-  const headers = { apikey: apiKey };
+  const requestConfig = { headers: headers(config.apiKey), timeout: 15000 };
   const attempts = [
-    { method: 'get', url: `${baseURL}/instance/connect/${instance}` },
-    { method: 'get', url: `${baseURL}/instance/qrcode/${instance}` }
+    { method: 'get', url: `${config.baseURL}/instance/connect/${config.instance}` },
+    { method: 'get', url: `${config.baseURL}/instance/qrcode/${config.instance}` }
   ];
 
   for (const attempt of attempts) {
     try {
-      const response = await axios({ ...attempt, headers, timeout: 15000 });
-      return { ok: true, instance, data: response.data };
+      const response = await axios({ ...attempt, ...requestConfig });
+      return { ok: true, instance: config.instance, data: response.data };
     } catch (error) {
-      logger.warn({ err: error.message, url: attempt.url }, 'Evolution QR attempt failed');
+      logger.warn({ err: error.response?.data || error.message, url: attempt.url }, 'Evolution QR attempt failed');
     }
   }
 
-  return { ok: false, instance, error: 'Could not get QR code from Evolution API' };
+  return { ok: false, instance: config.instance, error: 'Nao foi possivel obter QR Code da Evolution API' };
 }

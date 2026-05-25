@@ -1,20 +1,32 @@
-# Arquitetura ArthillesBot
+# Arquitetura
+
+O ArthillesBot agora e um SaaS web leve. Nao ha Docker obrigatorio, n8n obrigatorio, Ollama ou banco local.
 
 ```text
 WhatsApp
   -> Evolution API
-  -> Webhook unico do Backend Node.js
-  -> PostgreSQL
-  -> Dashboard Next.js
+  -> POST /webhook/evolution
+  -> Backend Node.js/Express
+  -> Supabase Postgres
+  -> FAQ Google Sheets e IA OpenRouter
+  -> Evolution API envia resposta
 
-n8n atua apenas como orquestrador auxiliar.
-Ollama fornece IA local gratuita para respostas complementares.
-Redis atende cache e dependencias da Evolution API.
+Dashboard Next.js
+  -> Backend Express
+  -> Supabase
 ```
 
-## Decisoes principais
+## Decisoes
 
-- O backend centraliza cadastro, agenda, disponibilidade e conversa.
-- O n8n nao recebe o webhook principal para evitar fluxos conflitantes.
-- O PostgreSQL e a fonte de verdade.
-- O Ollama e opcional em runtime: se o modelo ainda nao foi baixado, o bot usa mensagens deterministicas.
+- O backend centraliza webhook, agenda, conversa, CRM e configuracoes.
+- O dashboard nunca acessa a service role do Supabase.
+- Todo registro operacional tem `company_id`.
+- O FAQ pode vir do banco ou de uma planilha Google Sheets publicada em CSV.
+- OpenRouter e opcional: se nao houver chave, o bot usa FAQ e respostas deterministicas.
+- O webhook principal e unico para evitar fluxos duplicados.
+
+## Deploy
+
+- `backend/`: Railway com Nixpacks e healthcheck `/health`.
+- `dashboard/`: Vercel com `NEXT_PUBLIC_BACKEND_URL`.
+- `supabase/schema.sql`: schema inicial do banco.

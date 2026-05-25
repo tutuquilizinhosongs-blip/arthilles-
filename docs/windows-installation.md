@@ -1,59 +1,49 @@
-# Instalacao Windows Para Cliente
+# Uso No Windows
 
-## Requisitos
+O ArthillesBot nao precisa mais ser instalado localmente no Windows do cliente.
 
-- Windows 10 ou 11
-- Docker Desktop instalado e aberto
-- PowerShell
-
-## Passos
-
-```powershell
-copy .env.example .env
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\start-windows.ps1
-```
-
-Se a execucao de scripts estiver bloqueada:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-powershell -ExecutionPolicy Bypass -File .\scripts\start-windows.ps1
-```
-
-## Validacao
-
-```powershell
-docker compose ps
-docker exec arthilles_backend node -e "fetch('http://localhost:3001/health').then(r=>r.text()).then(console.log)"
-```
-
-## Android na mesma rede
-
-O script de inicio mostra o link para abrir no celular. Se precisar descobrir manualmente:
-
-```powershell
-ipconfig
-```
-
-No celular Android, abra:
+O cliente acessa o painel pelo navegador:
 
 ```text
-http://IP-DO-PC:3000
+https://seu-dashboard.vercel.app
 ```
 
-No Chrome, use `Adicionar a tela inicial` para instalar como PWA.
+## Para Desenvolver No Windows
 
-## Personalizacao
+Instale Node.js 20+ e rode os dois projetos:
 
-No dashboard, abra `Configuracoes` para alterar nome da empresa, logo, cores, horarios, mensagem inicial e Google Sheets de FAQ.
+```powershell
+cd backend
+copy .env.example .env
+npm install
+npm run dev
+```
 
-## Portas
+Em outro PowerShell:
 
-- `3000`: Dashboard
-- `3001`: Backend
-- `5432`: PostgreSQL
-- `5678`: n8n
-- `6379`: Redis
-- `8080`: Evolution API
-- `11434`: Ollama
+```powershell
+cd dashboard
+copy .env.example .env.local
+npm install
+npm run dev
+```
+
+Acesse:
+
+```text
+http://localhost:3000
+```
+
+## Android
+
+No Android, abra a mesma URL do dashboard publicada na Vercel:
+
+```text
+https://seu-dashboard.vercel.app
+```
+
+O layout e responsivo e ja possui manifest para evoluir como PWA.
+
+## Sem Docker Obrigatorio
+
+Nao ha `docker compose`, scripts PowerShell de instalacao ou banco local obrigatorio. Os dados ficam no Supabase e o backend roda online.

@@ -1,220 +1,199 @@
 # ArthillesBot
 
-ArthillesBot e um sistema white-label local para pequenas empresas fazerem atendimento automatico no WhatsApp, cadastro de clientes, agendamentos, FAQ e acompanhamento pelo painel.
+ArthillesBot e um SaaS web simples para atendimento automatico no WhatsApp com agenda, CRM, FAQ por Google Sheets e IA via OpenRouter.
 
-O computador Windows do cliente funciona como servidor local. O celular Android acessa o painel pelo navegador/PWA na mesma rede, sem instalar Docker no Android.
+O projeto deixou de depender de Docker, n8n, Ollama e instalacao local pesada. A arquitetura atual e pensada para deploy gratuito ou de baixo custo em Vercel + Railway + Supabase.
+
+## Stack
+
+- Dashboard: Next.js responsivo, pronto para PWA
+- Backend: Node.js/Express
+- Banco: Supabase Postgres
+- WhatsApp: Evolution API
+- IA: OpenRouter
+- FAQ externa: Google Sheets publicado em CSV
 
 ## Arquitetura
 
 ```text
-Windows do cliente
-  -> Docker Compose
+Cliente no WhatsApp
   -> Evolution API
-  -> Backend Node.js
-  -> PostgreSQL
-  -> Dashboard Next.js PWA
-  -> Google Sheets para FAQ
-  -> Ollama opcional para IA local
+  -> Webhook unico do backend Railway
+  -> Supabase
+  -> OpenRouter e/ou Google Sheets FAQ
+  -> Resposta pelo WhatsApp
 
-Android
-  -> Navegador/PWA
-  -> http://IP-DO-COMPUTADOR:3000
+Administrador
+  -> Dashboard Next.js na Vercel
+  -> Backend Express na Railway
+  -> Supabase
 ```
 
-n8n nao e obrigatorio. Ele fica disponivel apenas como opcional para automacoes futuras.
+## Funcionalidades
 
-## O Que O Cliente Consegue Fazer
+- Login no painel
+- Base multiempresa com `company_id`
+- Conexao WhatsApp por QR Code
+- Recebimento de mensagens por webhook
+- Respostas automaticas por FAQ e IA
+- Cadastro automatico de clientes
+- Agendamento automatico com bloqueios
+- Painel de clientes, conversas, agendamentos, duvidas e configuracoes
+- Configuracao de marca, cores, horarios, Google Sheets, OpenRouter e Evolution API
+- Dashboard responsivo para Android
 
-- Entrar no painel com login local.
-- Personalizar nome da empresa, logo, cores e mensagem inicial.
-- Conectar WhatsApp por QR Code usando Evolution API.
-- Responder duvidas por FAQ local ou Google Sheets.
-- Usar Ollama como IA local opcional, sem OpenAI paga.
-- Cadastrar clientes automaticamente.
-- Agendar reunioes automaticamente.
-- Bloquear feriados, viagens, folgas e horarios indisponiveis.
-- Ver clientes, conversas, agendamentos, logs e status.
-- Acessar pelo Android na mesma rede como PWA.
-
-## Instalacao Windows
-
-1. Instale o Docker Desktop.
-2. Baixe ou clone este repositorio.
-3. Abra o PowerShell na pasta do projeto.
-4. Rode:
-
-```powershell
-copy .env.example .env
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\start-windows.ps1
-```
-
-O script mostra os enderecos locais e tambem os links para abrir no Android.
-Se o Docker Desktop estiver fechado, o script tenta abrir automaticamente e aguardar o Docker ficar pronto.
-
-## Instalador .exe
-
-Para gerar o instalador Windows:
-
-```powershell
-.\installer\build-installer.ps1
-```
-
-Resultado:
+## Estrutura
 
 ```text
-dist\ArthillesSetup.exe
+backend/       API Express para Railway
+dashboard/     Painel Next.js para Vercel
+docs/          Guias de deploy e operacao
+supabase/      Schema SQL inicial
+.env.example   Variaveis de ambiente de referencia
 ```
 
-O instalador copia o sistema para `C:\Arthilles`, cria atalhos na area de trabalho, cria `C:\Arthilles\data` para dados persistentes, valida Docker Desktop e inicia o sistema.
+## Configuracao Do Banco
 
-## Acesso
-
-- Dashboard: http://localhost:3000
-- Status do dashboard: http://localhost:3000/status
-- Backend: http://localhost:3001
-- Evolution API: http://localhost:8080
-- Ollama: http://localhost:11434
-
-No Android, use:
+1. Crie um projeto no Supabase.
+2. Abra `SQL Editor`.
+3. Execute o arquivo:
 
 ```text
-http://IP-DO-COMPUTADOR:3000
+supabase/schema.sql
 ```
 
-O IP aparece ao rodar `scripts/start-windows.ps1`. Tambem pode ser encontrado com:
-
-```powershell
-ipconfig
-```
-
-## Login Inicial
-
-As credenciais iniciais ficam no `.env`:
+O schema cria uma empresa demo e um usuario inicial:
 
 ```text
+email: admin@arthilles.local
+senha: admin123
+```
+
+Troque a senha antes de usar em producao. O hash depende de `AUTH_SECRET`; se mudar `AUTH_SECRET`, gere novo `password_hash`.
+
+## Backend No Railway
+
+1. Crie um novo projeto Railway apontando para a pasta `backend`.
+2. Configure as variaveis:
+
+```env
+NODE_ENV=production
+PORT=3001
+AUTH_SECRET=troque_este_segredo
+ALLOW_BOOTSTRAP_LOGIN=true
 ADMIN_EMAIL=admin@arthilles.local
 ADMIN_PASSWORD=admin123
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key
+DEFAULT_COMPANY_ID=00000000-0000-0000-0000-000000000001
+OPENROUTER_API_KEY=sua_chave_openrouter
+OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
+BACKEND_PUBLIC_URL=https://seu-backend.railway.app
+DASHBOARD_PUBLIC_URL=https://seu-dashboard.vercel.app
+CORS_ORIGIN=https://seu-dashboard.vercel.app
+WEBHOOK_SHARED_SECRET=um_segredo_opcional
 ```
 
-Troque antes de entregar para um cliente.
+3. Deploy command: `npm start`.
+4. Healthcheck: `/health`.
 
-## WhatsApp
+## Dashboard Na Vercel
 
-1. Acesse o dashboard.
-2. Faca login.
-3. Abra a aba `WhatsApp`.
+1. Crie um projeto Vercel apontando para a pasta `dashboard`.
+2. Configure:
+
+```env
+NEXT_PUBLIC_BACKEND_URL=https://seu-backend.railway.app
+```
+
+3. Deploy normalmente.
+
+## Deploy Automatico
+
+Conecte este repositorio ao Railway e a Vercel. Depois disso, cada push na branch `main` gera novo deploy dos servicos configurados.
+
+O workflow `.github/workflows/ci.yml` valida backend e dashboard em pull requests e pushes.
+
+## Evolution API
+
+Hospede ou use uma Evolution API acessivel pela internet. No painel:
+
+1. Abra `Configuracoes`.
+2. Preencha URL da Evolution, instancia e API key.
+3. Abra `WhatsApp`.
 4. Clique em `Criar instancia`.
 5. Clique em `Gerar QR Code`.
-6. Leia o QR Code com o WhatsApp.
+6. Escaneie com o WhatsApp.
+7. Clique em `Configurar webhook`.
 
-O webhook principal fica no backend:
+O webhook gerado segue este formato:
 
 ```text
-http://backend:3001/webhook/evolution
+https://seu-backend.railway.app/webhook/evolution?companyId=ID_DA_EMPRESA
 ```
 
-## White-label
-
-No painel, abra `Configuracoes` para editar:
-
-- Nome da empresa
-- URL da logo
-- Cor principal
-- Cor de destaque
-- Horario de atendimento
-- Antecedencia minima
-- Mensagem inicial do WhatsApp
-- Ativar/desativar Ollama
-- Google Sheets para FAQ
-
-## FAQ Com Google Sheets
+## Google Sheets FAQ
 
 Crie uma planilha publica com as colunas:
 
-```text
-pergunta,resposta,palavras
-```
-
-Publique ou exporte como CSV e cole o link na tela `Configuracoes`.
-
-Exemplo de cabecalho:
-
 ```csv
 pergunta,resposta,palavras
-Como funciona?,Atendemos pelo WhatsApp e agendamos uma reuniao.,atendimento;agenda
+Como funciona?,Atendemos pelo WhatsApp e agendamos pelo painel.,atendimento;agenda
 ```
 
-## Ollama Opcional
+Publique como CSV e cole o link em `Configuracoes`.
 
-O sistema funciona sem modelo baixado. Para usar IA local:
+## Desenvolvimento Local
+
+Backend:
 
 ```powershell
-docker exec -it arthilles_ollama ollama pull llama3
+cd backend
+copy .env.example .env
+npm install
+npm run dev
 ```
 
-Sem OpenAI paga e sem API paga.
-
-## n8n Opcional
-
-n8n nao sobe no fluxo padrao. Para habilitar quando quiser:
+Dashboard:
 
 ```powershell
-docker compose --profile optional up -d n8n
+cd dashboard
+copy .env.example .env.local
+npm install
+npm run dev
 ```
 
-Depois acesse:
+Acesse:
+
+- Dashboard: http://localhost:3000
+- Backend: http://localhost:3001
+- Status: http://localhost:3000/status
+
+## Teste Rapido Do Fluxo
+
+1. Entre no painel.
+2. Configure Supabase, Evolution API, OpenRouter e Google Sheets.
+3. Conecte o WhatsApp por QR Code.
+4. Envie `oi` para o numero conectado.
+5. Envie `agendar`.
+6. Responda os dados solicitados.
+7. Escolha um horario da lista.
+8. Confira o cliente, mensagens e agendamento no dashboard.
+
+## Android
+
+O painel e responsivo. No celular, abra a URL da Vercel:
 
 ```text
-http://localhost:5678
+https://seu-dashboard.vercel.app
 ```
 
-## Backup
+Quando o PWA estiver habilitado no navegador, use `Adicionar a tela inicial`.
 
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\backup-windows.ps1
-```
+## Observacoes De Seguranca
 
-## Logs
-
-```powershell
-.\scripts\logs-windows.ps1
-.\scripts\logs-windows.ps1 backend
-```
-
-## Parar
-
-```powershell
-.\scripts\stop-windows.ps1
-```
-
-## Validacao Tecnica
-
-```powershell
-docker compose config
-docker compose up -d --build
-docker compose ps
-```
-
-Endpoints importantes:
-
-- `GET /`
-- `GET /health`
-- `GET /status`
-- `GET /network`
-- `POST /webhook/evolution`
-- `GET /availability`
-- `GET /availability/blocks`
-- `GET /faqs`
-- `GET /faqs/google-sheets/preview`
-
-## Ubuntu
-
-Ubuntu nao e prioridade do produto white-label, mas os scripts continuam disponiveis para uso tecnico:
-
-```bash
-cp .env.example .env
-chmod +x scripts/*.sh
-./scripts/start-ubuntu.sh
-```
+- Nunca exponha `SUPABASE_SERVICE_ROLE_KEY` no dashboard.
+- A service role key fica somente no backend.
+- Troque `AUTH_SECRET`, usuario inicial e senhas antes de producao.
+- Depois de criar usuarios reais, defina `ALLOW_BOOTSTRAP_LOGIN=false`.
+- Use um segredo em `WEBHOOK_SHARED_SECRET` se sua Evolution API permitir configurar headers ou query string.

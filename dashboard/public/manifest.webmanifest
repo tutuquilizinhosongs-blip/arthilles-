@@ -1,7 +1,7 @@
 {
   "name": "ArthillesBot",
   "short_name": "Arthilles",
-  "description": "Dashboard local de atendimento WhatsApp, agenda e IA.",
+  "description": "Dashboard SaaS de atendimento WhatsApp, agenda e IA.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -2,7 +2,7 @@ import './globals.css';
 
 export const metadata = {
   title: 'ArthillesBot',
-  description: 'Dashboard administrativo local para WhatsApp e agenda',
+  description: 'Dashboard SaaS para WhatsApp, agenda e IA',
   manifest: '/manifest.webmanifest'
 };
 

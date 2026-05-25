@@ -1,55 +1,151 @@
-import pg from 'pg';
+import { createClient } from '@supabase/supabase-js';
 
-const { Pool } = pg;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 10
-});
+export const supabase = supabaseUrl && supabaseServiceRoleKey
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    })
+  : null;
 
-export async function query(text, params) {
-  return pool.query(text, params);
+export function requireSupabase() {
+  if (!supabase) {
+    throw new Error('Supabase nao configurado. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.');
+  }
+  return supabase;
 }
 
-export async function getSettingsMap() {
-  const result = await query('SELECT key, value FROM settings ORDER BY key');
-  return Object.fromEntries(result.rows.map((row) => [row.key, row.value]));
+export function defaultBusinessHours() {
+  return {
+    days: [1, 2, 3, 4, 5],
+    start: '13:30',
+    end: '16:30',
+    slotMinutes: 60,
+    minimumNoticeHours: 6
+  };
 }
 
-export async function ensureApplicationSchema() {
-  await query(`
-    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+export function normalizeCompany(company = {}) {
+  const settings = company.settings || {};
+  const business = { ...defaultBusinessHours(), ...(settings.business_hours || {}) };
 
-    CREATE TABLE IF NOT EXISTS faq_items (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      question TEXT NOT NULL,
-      answer TEXT NOT NULL,
-      keywords TEXT[] NOT NULL DEFAULT '{}',
-      active BOOLEAN NOT NULL DEFAULT true,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
+  return {
+    ...company,
+    settings: {
+      welcomeMessage: settings.welcomeMessage || 'Ola! Sou o assistente virtual. Posso tirar duvidas ou agendar um horario.',
+      business_hours: business,
+      assistant: {
+        enabled: settings.assistant?.enabled !== false,
+        provider: 'openrouter'
+      }
+    }
+  };
+}
 
-    CREATE TABLE IF NOT EXISTS admin_users (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      name TEXT NOT NULL,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
+export async function getCompany(companyId) {
+  const db = requireSupabase();
+  const targetId = companyId || process.env.DEFAULT_COMPANY_ID;
+  let request = db.from('companies').select('*');
 
-    INSERT INTO settings (key, value) VALUES
-    ('whatsapp', '{"instance":"arthilles","connected":false}'::jsonb),
-    ('faq', '{"enabled":true,"preferFaq":true}'::jsonb),
-    ('theme', '{"primaryColor":"#176b87","accentColor":"#2f7d32","logoUrl":""}'::jsonb),
-    ('google_sheets', '{"enabled":false,"csvUrl":"","instructions":"Use uma planilha publica com colunas pergunta,resposta,palavras."}'::jsonb)
-    ON CONFLICT (key) DO NOTHING;
+  request = targetId ? request.eq('id', targetId).maybeSingle() : request.limit(1).maybeSingle();
+  const { data, error } = await request;
+  if (error) throw error;
+  if (!data) throw new Error('Empresa nao encontrada no Supabase.');
+  return normalizeCompany(data);
+}
 
-    INSERT INTO faq_items (question, answer, keywords) VALUES
-    ('Como funciona o atendimento?', 'Nos fazemos um diagnostico inicial pelo WhatsApp e, se fizer sentido, agendamos uma reuniao.', ARRAY['atendimento','funciona','como funciona']),
-    ('Quais horarios estao disponiveis?', 'Os horarios disponiveis aparecem automaticamente durante o agendamento, respeitando agenda, bloqueios e antecedencia minima.', ARRAY['horario','agenda','disponivel']),
-    ('A IA e paga?', 'Nao. O ArthillesBot usa Ollama com modelo open source local, sem OpenAI paga.', ARRAY['ia','openai','paga','ollama'])
-    ON CONFLICT DO NOTHING;
-  `);
+export async function getCompanyByInstance(instanceName) {
+  const db = requireSupabase();
+  if (instanceName) {
+    const { data, error } = await db
+      .from('companies')
+      .select('*')
+      .eq('evolution_instance_name', instanceName)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) return normalizeCompany(data);
+  }
+
+  return getCompany();
+}
+
+export function settingsFromCompany(company) {
+  const normalized = normalizeCompany(company);
+  const settings = normalized.settings || {};
+
+  return {
+    company: {
+      id: normalized.id,
+      name: normalized.name || 'Arthilles',
+      slug: normalized.slug || 'arthilles',
+      welcomeMessage: settings.welcomeMessage
+    },
+    theme: {
+      logoUrl: normalized.logo_url || '',
+      primaryColor: normalized.primary_color || '#176b87',
+      accentColor: normalized.accent_color || '#2f7d32'
+    },
+    business_hours: settings.business_hours || defaultBusinessHours(),
+    google_sheets: {
+      enabled: Boolean(normalized.google_sheets_url),
+      csvUrl: normalized.google_sheets_url || '',
+      instructions: 'Use uma planilha publica com colunas pergunta,resposta,palavras.'
+    },
+    assistant: {
+      enabled: settings.assistant?.enabled !== false,
+      provider: 'openrouter',
+      model: normalized.openrouter_model || process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free'
+    },
+    evolution: {
+      baseUrl: normalized.evolution_base_url || process.env.EVOLUTION_BASE_URL || '',
+      instance: normalized.evolution_instance_name || process.env.EVOLUTION_INSTANCE_NAME || 'arthilles',
+      configured: Boolean(normalized.evolution_api_key || process.env.EVOLUTION_API_KEY)
+    }
+  };
+}
+
+export async function updateCompanySettings(companyId, payload = {}) {
+  const db = requireSupabase();
+  const current = await getCompany(companyId);
+  const currentSettings = current.settings || {};
+  const nextSettings = {
+    ...currentSettings,
+    welcomeMessage: payload.company?.welcomeMessage ?? currentSettings.welcomeMessage,
+    business_hours: {
+      ...(currentSettings.business_hours || defaultBusinessHours()),
+      ...(payload.business_hours || {})
+    },
+    assistant: {
+      ...(currentSettings.assistant || {}),
+      ...(payload.assistant || {})
+    }
+  };
+
+  const changes = {
+    name: payload.company?.name ?? current.name,
+    logo_url: payload.theme?.logoUrl ?? current.logo_url,
+    primary_color: payload.theme?.primaryColor ?? current.primary_color,
+    accent_color: payload.theme?.accentColor ?? current.accent_color,
+    google_sheets_url: payload.google_sheets?.csvUrl ?? current.google_sheets_url,
+    openrouter_model: payload.assistant?.model ?? current.openrouter_model,
+    evolution_base_url: payload.evolution?.baseUrl ?? current.evolution_base_url,
+    evolution_instance_name: payload.evolution?.instance ?? current.evolution_instance_name,
+    settings: nextSettings,
+    updated_at: new Date().toISOString()
+  };
+
+  if (payload.evolution?.apiKey) {
+    changes.evolution_api_key = payload.evolution.apiKey;
+  }
+
+  const { data, error } = await db
+    .from('companies')
+    .update(changes)
+    .eq('id', companyId)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return settingsFromCompany(data);
 }

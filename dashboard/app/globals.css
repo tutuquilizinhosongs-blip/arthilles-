@@ -29,6 +29,10 @@ button {
   background: var(--accent);
   color: #fff;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 40px;
   padding: 0 14px;
 }
@@ -77,7 +81,7 @@ pre {
   margin: 0;
 }
 
-.login-card p, .error, .banner, .brand span, .row span {
+.login-card p, .error, .banner, .success, .brand span, .row span {
   color: var(--muted);
 }
 
@@ -172,6 +176,15 @@ nav button.active, nav button:hover, .ghost:hover {
   background: #fff1f0;
   border: 1px solid #ffd0cc;
   border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.success {
+  background: #eef8f0;
+  border: 1px solid #bfe5c8;
+  border-radius: 8px;
+  color: var(--ok);
   padding: 12px;
   margin-bottom: 16px;
 }
