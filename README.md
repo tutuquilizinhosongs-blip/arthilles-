@@ -74,11 +74,16 @@ Troque a senha antes de usar em producao. O hash depende de `AUTH_SECRET`; se mu
 ## Backend No Railway
 
 1. Crie um novo projeto Railway apontando para a pasta `backend`.
-2. Configure as variaveis:
+2. Em `Settings` do servico:
+   - `Root Directory`: `backend`
+   - `Build Strategy`: `Dockerfile` (arquivo `Dockerfile` dentro de `backend`)
+   - `Build Command`: vazio (o build e feito pelo Dockerfile)
+   - `Start Command`: `npm start`
+   - `Healthcheck Path`: `/health`
+3. Configure as variaveis:
 
 ```env
 NODE_ENV=production
-PORT=3001
 AUTH_SECRET=troque_este_segredo
 ALLOW_BOOTSTRAP_LOGIN=true
 ADMIN_EMAIL=admin@arthilles.local
@@ -98,8 +103,12 @@ EVOLUTION_API_URL=https://sua-evolution-api.exemplo.com
 EVOLUTION_API_KEY=sua_evolution_api_key
 ```
 
-3. Deploy command: `npm start`.
-4. Healthcheck: `/health`.
+4. Nao defina `NPM_CONFIG_PRODUCTION=true` no Railway (isso reativa fluxo legado com warning de `production`).
+5. Gere um dominio publico em `Networking` e valide:
+
+```text
+GET https://SEU-BACKEND.up.railway.app/health
+```
 
 ## Dashboard Na Vercel
 

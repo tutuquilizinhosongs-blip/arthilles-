@@ -11,11 +11,18 @@
 
 Configure a pasta raiz do servico como `backend`.
 
+Em `Settings`:
+
+- Build Strategy: `Dockerfile`
+- Dockerfile: `Dockerfile` (com Root Directory em `backend`)
+- Build Command: vazio (usa o Dockerfile)
+- Start Command: `npm start`
+- Healthcheck: `/health`
+
 Variaveis:
 
 ```env
 NODE_ENV=production
-PORT=3001
 AUTH_SECRET=troque_este_segredo
 ALLOW_BOOTSTRAP_LOGIN=true
 ADMIN_EMAIL=admin@arthilles.local
@@ -33,6 +40,8 @@ GOOGLE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/.../export?format=c
 EVOLUTION_API_URL=https://sua-evolution-api.exemplo.com
 EVOLUTION_API_KEY=sua_evolution_api_key
 ```
+
+Importante: nao usar `NPM_CONFIG_PRODUCTION=true`.
 
 ## 3. Vercel Dashboard
 

@@ -36,7 +36,6 @@ No Supabase Dashboard:
 
 ```env
 NODE_ENV=production
-PORT=3001
 BACKEND_PUBLIC_URL=https://SEU-BACKEND.up.railway.app
 DASHBOARD_PUBLIC_URL=https://SEU-FRONTEND.vercel.app
 CORS_ORIGIN=https://SEU-FRONTEND.vercel.app,https://*.vercel.app
@@ -61,6 +60,8 @@ EVOLUTION_API_URL=https://SUA-EVOLUTION.exemplo.com
 EVOLUTION_API_KEY=sua_evolution_api_key
 EVOLUTION_INSTANCE_NAME=arthilles-demo
 ```
+
+Nao defina `NPM_CONFIG_PRODUCTION=true`.
 
 ### Frontend (Vercel)
 
@@ -91,12 +92,13 @@ Nota: hoje o frontend usa a API do backend para dados. `SUPABASE_URL` e `SUPABAS
 2. Clique em `New Project` -> `Deploy from GitHub Repo`.
 3. Selecione o repositorio `arthilles`.
 4. Em `Root Directory`, configure `backend`.
-5. Em `Variables`, cole todas as variaveis do bloco Backend acima.
-6. Em `Networking`, clique `Generate Domain`.
-7. Copie a URL publica (`https://...up.railway.app`) e atualize:
+5. Em `Build`, use `Dockerfile` (arquivo `Dockerfile` dentro de `backend`) e deixe `Build Command` vazio.
+6. Em `Deploy`, confirme `Start Command` = `npm start` e `Healthcheck` = `/health`.
+7. Em `Variables`, cole todas as variaveis do bloco Backend acima.
+8. Em `Networking`, clique `Generate Domain`.
+9. Copie a URL publica (`https://...up.railway.app`) e atualize:
    - `BACKEND_PUBLIC_URL`
    - `NEXT_PUBLIC_API_URL` no Vercel
-8. Garanta `Healthcheck` em `/health`.
 
 ## 7. Corrigir URLs publicas (ordem exata)
 

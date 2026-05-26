@@ -14,9 +14,10 @@ Use este checklist para colocar o Arthilles em producao SaaS.
 ## 2. Backend (Railway)
 
 - [ ] Servico criado com raiz em `backend`.
+- [ ] Build Strategy = `Dockerfile` (arquivo `Dockerfile` dentro de `backend`).
+- [ ] Build Command vazio.
 - [ ] Variaveis configuradas:
   - `NODE_ENV=production`
-  - `PORT=3001`
   - `AUTH_SECRET`
   - `ALLOW_BOOTSTRAP_LOGIN`
   - `ADMIN_EMAIL`
@@ -34,6 +35,7 @@ Use este checklist para colocar o Arthilles em producao SaaS.
   - `GOOGLE_SHEETS_CSV_URL` (opcional, fallback do painel)
   - `EVOLUTION_API_URL`
   - `EVOLUTION_API_KEY`
+- [ ] `NPM_CONFIG_PRODUCTION` ausente (ou `false`).
 - [ ] Deploy realizado com `npm start`.
 - [ ] Healthcheck Railway apontando para `/health`.
 
