@@ -1,4 +1,4 @@
-function parseCsvLine(line) {
+function parseCsvLine(line, delimiter = ',') {
   const values = [];
   let current = '';
   let quoted = false;
@@ -12,7 +12,7 @@ function parseCsvLine(line) {
       index += 1;
     } else if (char === '"') {
       quoted = !quoted;
-    } else if (char === ',' && !quoted) {
+    } else if (char === delimiter && !quoted) {
       values.push(current.trim());
       current = '';
     } else {
@@ -22,6 +22,12 @@ function parseCsvLine(line) {
 
   values.push(current.trim());
   return values;
+}
+
+function detectDelimiter(line) {
+  const commaCount = (line.match(/,/g) || []).length;
+  const semicolonCount = (line.match(/;/g) || []).length;
+  return semicolonCount > commaCount ? ';' : ',';
 }
 
 function normalizeSheetUrl(url) {
@@ -49,7 +55,8 @@ export async function fetchGoogleSheetFaqs(settings = {}) {
   const lines = csv.split(/\r?\n/).filter(Boolean);
   if (!lines.length) return [];
 
-  const headers = parseCsvLine(lines[0]).map((header) => header.toLowerCase().trim());
+  const delimiter = detectDelimiter(lines[0]);
+  const headers = parseCsvLine(lines[0], delimiter).map((header) => header.replace(/^\uFEFF/, '').toLowerCase().trim());
   const questionIndex = headers.findIndex((header) => ['pergunta', 'question'].includes(header));
   const answerIndex = headers.findIndex((header) => ['resposta', 'answer'].includes(header));
   const keywordsIndex = headers.findIndex((header) => ['palavras', 'keywords', 'tags'].includes(header));
@@ -57,7 +64,7 @@ export async function fetchGoogleSheetFaqs(settings = {}) {
   if (questionIndex < 0 || answerIndex < 0) return [];
 
   return lines.slice(1).map((line) => {
-    const values = parseCsvLine(line);
+    const values = parseCsvLine(line, delimiter);
     return {
       question: values[questionIndex] || '',
       answer: values[answerIndex] || '',

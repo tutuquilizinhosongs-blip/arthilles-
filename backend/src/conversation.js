@@ -57,11 +57,31 @@ async function storeMessage(companyId, phone, direction, body, rawPayload = null
 
 async function getSession(companyId, phone) {
   const db = requireSupabase();
+  const existing = await db
+    .from('conversation_sessions')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('phone', phone)
+    .maybeSingle();
+
+  if (existing.error) throw existing.error;
+  if (existing.data) {
+    const updatedAt = new Date().toISOString();
+    const update = await db
+      .from('conversation_sessions')
+      .update({ updated_at: updatedAt })
+      .eq('company_id', companyId)
+      .eq('phone', phone);
+    if (update.error) throw update.error;
+    return { ...existing.data, updated_at: updatedAt };
+  }
+
   const { data, error } = await db
     .from('conversation_sessions')
-    .upsert({ company_id: companyId, phone, updated_at: new Date().toISOString() }, { onConflict: 'company_id,phone' })
+    .insert({ company_id: companyId, phone })
     .select('*')
     .single();
+
   if (error) throw error;
   return data;
 }
@@ -143,7 +163,7 @@ export async function handleConversation({ company, phone: rawPhone, body, rawPa
   const data = session.data || {};
   let reply;
 
-  if (['oi', 'ola', 'olá', 'bom dia', 'boa tarde', 'boa noite', 'inicio', 'iniciar'].includes(normalizeText(cleanBody))) {
+  if (['oi', 'ola', 'bom dia', 'boa tarde', 'boa noite', 'inicio', 'iniciar'].includes(normalizeText(cleanBody))) {
     await updateSession(company.id, phone, 'greeting', {});
     reply = `${settings.company.welcomeMessage}\n\nPosso tirar duvidas ou agendar um atendimento. Para agendar, responda "agendar".`;
   } else if (wantsScheduling(cleanBody) && !['collecting', 'scheduling'].includes(session.state)) {
@@ -170,6 +190,25 @@ export async function handleConversation({ company, phone: rawPhone, body, rawPa
     if (!selected) {
       reply = 'Responda com o numero de um horario da lista para confirmar o agendamento.';
     } else {
+      const freshSlots = await getAvailableSlots({
+        company,
+        from: selected.startsAt,
+        to: selected.endsAt
+      });
+      const stillAvailable = freshSlots.some((slot) => (
+        new Date(slot.startsAt).getTime() === new Date(selected.startsAt).getTime() &&
+        new Date(slot.endsAt).getTime() === new Date(selected.endsAt).getTime()
+      ));
+
+      if (!stillAvailable) {
+        const slots = await getAvailableSlots({ company });
+        data.availableSlots = slots.slice(0, 6);
+        await updateSession(company.id, phone, 'scheduling', data, session.client_id);
+        reply = `Esse horario acabou de ficar indisponivel.\n${formatSlots(slots)}`;
+        await storeMessage(company.id, phone, 'outbound', reply);
+        return { phone, reply };
+      }
+
       const { data: appointment, error } = await db
         .from('appointments')
         .insert({

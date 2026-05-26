@@ -239,7 +239,12 @@ router.post('/appointments', async (req, res) => {
   const input = schema.parse(req.body);
   const company = await getCompany(tenantId(req));
   const slots = await getAvailableSlots({ company, from: input.starts_at, to: input.ends_at });
-  const allowed = slots.some((slot) => slot.startsAt === input.starts_at && slot.endsAt === input.ends_at);
+  const requestedStart = new Date(input.starts_at).getTime();
+  const requestedEnd = new Date(input.ends_at).getTime();
+  const allowed = slots.some((slot) => (
+    new Date(slot.startsAt).getTime() === requestedStart &&
+    new Date(slot.endsAt).getTime() === requestedEnd
+  ));
   if (!allowed) return res.status(409).json({ error: 'Horario indisponivel ou com menos de 6 horas de antecedencia.' });
 
   const db = requireSupabase();

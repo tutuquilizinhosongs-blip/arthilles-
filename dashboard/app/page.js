@@ -313,7 +313,7 @@ export default function Dashboard() {
 
       <section className="content">
         <header className="topbar">
-          <div><h1>{nav.find(([id]) => id === tab)?.[2]}</h1><p>{user?.email} · {data.settings.company?.slug || 'empresa'}</p></div>
+          <div><h1>{nav.find(([id]) => id === tab)?.[2]}</h1><p>{user?.email} - {data.settings.company?.slug || 'empresa'}</p></div>
           <button className="icon-button" onClick={loadAll}><RefreshCw size={18} />Atualizar</button>
         </header>
         {error && <div className="banner">{error}</div>}
