@@ -84,14 +84,18 @@ ALLOW_BOOTSTRAP_LOGIN=true
 ADMIN_EMAIL=admin@arthilles.local
 ADMIN_PASSWORD=admin123
 SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_ANON_KEY=sua_anon_key
 SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key
 DEFAULT_COMPANY_ID=00000000-0000-0000-0000-000000000001
 OPENROUTER_API_KEY=sua_chave_openrouter
 OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
 BACKEND_PUBLIC_URL=https://seu-backend.railway.app
 DASHBOARD_PUBLIC_URL=https://seu-dashboard.vercel.app
-CORS_ORIGIN=https://seu-dashboard.vercel.app
+CORS_ORIGIN=https://seu-dashboard.vercel.app,https://*.vercel.app
 WEBHOOK_SHARED_SECRET=um_segredo_opcional
+GOOGLE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/.../export?format=csv
+EVOLUTION_API_URL=https://sua-evolution-api.exemplo.com
+EVOLUTION_API_KEY=sua_evolution_api_key
 ```
 
 3. Deploy command: `npm start`.
@@ -103,7 +107,9 @@ WEBHOOK_SHARED_SECRET=um_segredo_opcional
 2. Configure:
 
 ```env
-NEXT_PUBLIC_BACKEND_URL=https://seu-backend.railway.app
+NEXT_PUBLIC_API_URL=https://seu-backend.railway.app
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_ANON_KEY=sua_anon_key
 ```
 
 3. Deploy normalmente.
@@ -115,6 +121,7 @@ Conecte este repositorio ao Railway e a Vercel. Depois disso, cada push na branc
 O workflow `.github/workflows/ci.yml` valida backend e dashboard em pull requests e pushes.
 
 Checklist operacional: `docs/deploy-checklist.md`.
+Passo a passo completo: `docs/deploy-passo-a-passo.md`.
 
 ## Evolution API
 
@@ -205,3 +212,13 @@ Quando o PWA estiver habilitado no navegador, use `Adicionar a tela inicial`.
 - Backend local: `backend/.env.example`
 - Dashboard local: `dashboard/.env.example`
 - Referencia consolidada: `.env.example`
+
+Variaveis de integracao pedidas neste projeto:
+- `NEXT_PUBLIC_API_URL`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENROUTER_API_KEY`
+- `GOOGLE_SHEETS_CSV_URL`
+- `EVOLUTION_API_URL`
+- `EVOLUTION_API_KEY`

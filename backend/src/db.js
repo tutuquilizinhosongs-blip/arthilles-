@@ -73,6 +73,7 @@ export async function getCompanyByInstance(instanceName) {
 export function settingsFromCompany(company) {
   const normalized = normalizeCompany(company);
   const settings = normalized.settings || {};
+  const envGoogleSheets = process.env.GOOGLE_SHEETS_CSV_URL || '';
 
   return {
     company: {
@@ -88,8 +89,8 @@ export function settingsFromCompany(company) {
     },
     business_hours: settings.business_hours || defaultBusinessHours(),
     google_sheets: {
-      enabled: Boolean(normalized.google_sheets_url),
-      csvUrl: normalized.google_sheets_url || '',
+      enabled: Boolean(normalized.google_sheets_url || envGoogleSheets),
+      csvUrl: normalized.google_sheets_url || envGoogleSheets,
       instructions: 'Use uma planilha publica com colunas pergunta,resposta,palavras.'
     },
     assistant: {
@@ -98,7 +99,7 @@ export function settingsFromCompany(company) {
       model: normalized.openrouter_model || process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free'
     },
     evolution: {
-      baseUrl: normalized.evolution_base_url || process.env.EVOLUTION_BASE_URL || '',
+      baseUrl: normalized.evolution_base_url || process.env.EVOLUTION_API_URL || process.env.EVOLUTION_BASE_URL || '',
       instance: normalized.evolution_instance_name || process.env.EVOLUTION_INSTANCE_NAME || 'arthilles',
       configured: Boolean(normalized.evolution_api_key || process.env.EVOLUTION_API_KEY)
     }

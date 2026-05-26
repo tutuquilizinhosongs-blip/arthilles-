@@ -28,5 +28,5 @@ Dashboard Next.js
 ## Deploy
 
 - `backend/`: Railway com Nixpacks e healthcheck `/health`.
-- `dashboard/`: Vercel com `NEXT_PUBLIC_BACKEND_URL`.
+- `dashboard/`: Vercel com `NEXT_PUBLIC_API_URL`.
 - `supabase/schema.sql`: schema inicial do banco.

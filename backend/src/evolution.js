@@ -3,7 +3,7 @@ import { logger } from './logger.js';
 
 function configForCompany(company = {}) {
   return {
-    baseURL: company.evolution_base_url || process.env.EVOLUTION_BASE_URL,
+    baseURL: company.evolution_base_url || process.env.EVOLUTION_API_URL || process.env.EVOLUTION_BASE_URL,
     apiKey: company.evolution_api_key || process.env.EVOLUTION_API_KEY,
     instance: company.evolution_instance_name || process.env.EVOLUTION_INSTANCE_NAME || 'arthilles'
   };

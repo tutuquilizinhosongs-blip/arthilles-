@@ -35,7 +35,7 @@ npm install
 npm run dev
 ```
 
-Defina `NEXT_PUBLIC_BACKEND_URL=http://localhost:3001` para desenvolvimento.
+Defina `NEXT_PUBLIC_API_URL=http://localhost:3001` para desenvolvimento.
 
 ## Banco
 
@@ -61,7 +61,7 @@ Tabelas principais:
 - `OPENROUTER_API_KEY`
 - `BACKEND_PUBLIC_URL`
 - `DASHBOARD_PUBLIC_URL`
-- `NEXT_PUBLIC_BACKEND_URL`
+- `NEXT_PUBLIC_API_URL`
 
 ## Testes Manuais
 

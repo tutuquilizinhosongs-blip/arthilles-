@@ -15,10 +15,21 @@ const allowedOrigins = (process.env.CORS_ORIGIN || process.env.DASHBOARD_PUBLIC_
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+function matchOriginPattern(origin, pattern) {
+  if (pattern === '*') return true;
+  if (!pattern.includes('*')) return origin === pattern;
+
+  const escaped = pattern
+    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*');
+  return new RegExp(`^${escaped}$`).test(origin);
+}
+
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || !allowedOrigins.length || allowedOrigins.includes(origin)) return callback(null, true);
+    if (!origin || !allowedOrigins.length) return callback(null, true);
+    if (allowedOrigins.some((allowed) => matchOriginPattern(origin, allowed))) return callback(null, true);
     return callback(null, false);
   },
   credentials: true

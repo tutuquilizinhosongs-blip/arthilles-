@@ -7,6 +7,7 @@ Use este checklist para colocar o Arthilles em producao SaaS.
 - [ ] Projeto criado no Supabase.
 - [ ] Script `supabase/schema.sql` executado no SQL Editor.
 - [ ] `SUPABASE_URL` copiada.
+- [ ] `SUPABASE_ANON_KEY` copiada.
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` copiada.
 - [ ] Usuario inicial confirmado em `app_users` (ou criado novo admin).
 
@@ -22,20 +23,26 @@ Use este checklist para colocar o Arthilles em producao SaaS.
   - `ADMIN_PASSWORD`
   - `DEFAULT_COMPANY_ID`
   - `SUPABASE_URL`
+  - `SUPABASE_ANON_KEY`
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `OPENROUTER_API_KEY`
   - `OPENROUTER_MODEL`
   - `BACKEND_PUBLIC_URL`
   - `DASHBOARD_PUBLIC_URL`
-  - `CORS_ORIGIN`
+  - `CORS_ORIGIN` (ex.: `https://SEU-FRONTEND.vercel.app,https://*.vercel.app`)
   - `WEBHOOK_SHARED_SECRET` (opcional)
+  - `GOOGLE_SHEETS_CSV_URL` (opcional, fallback do painel)
+  - `EVOLUTION_API_URL`
+  - `EVOLUTION_API_KEY`
 - [ ] Deploy realizado com `npm start`.
 - [ ] Healthcheck Railway apontando para `/health`.
 
 ## 3. Dashboard (Vercel)
 
 - [ ] Projeto criado com raiz em `dashboard`.
-- [ ] Variavel `NEXT_PUBLIC_BACKEND_URL` configurada com a URL publica do backend.
+- [ ] Variavel `NEXT_PUBLIC_API_URL` configurada com a URL publica do backend.
+- [ ] Variavel `SUPABASE_URL` configurada.
+- [ ] Variavel `SUPABASE_ANON_KEY` configurada.
 - [ ] Deploy concluido sem erro.
 
 ## 4. Evolution API

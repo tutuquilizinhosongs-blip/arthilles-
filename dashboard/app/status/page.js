@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Activity, Bot } from 'lucide-react';
 
 function getBackendUrl() {
-  return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+  return process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 }
 
 export default function StatusPage() {

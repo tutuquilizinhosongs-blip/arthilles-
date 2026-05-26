@@ -45,9 +45,11 @@ function normalizeSheetUrl(url) {
 
 export async function fetchGoogleSheetFaqs(settings = {}) {
   const googleSheets = settings.google_sheets || {};
-  if (!googleSheets.enabled || !googleSheets.csvUrl) return [];
+  const csvUrl = googleSheets.csvUrl || process.env.GOOGLE_SHEETS_CSV_URL || '';
+  const enabled = googleSheets.enabled !== false && Boolean(csvUrl);
+  if (!enabled) return [];
 
-  const url = normalizeSheetUrl(googleSheets.csvUrl);
+  const url = normalizeSheetUrl(csvUrl);
   const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!response.ok) throw new Error(`Google Sheets retornou HTTP ${response.status}`);
 
