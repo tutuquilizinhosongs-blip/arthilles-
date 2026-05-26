@@ -71,9 +71,17 @@ router.get('/health', async (req, res) => {
 });
 
 router.post('/auth/login', async (req, res) => {
-  const result = await loginWithPassword(req.body);
-  if (!result) return res.status(401).json({ error: 'Email ou senha invalidos' });
-  res.json(result);
+  try {
+    const result = await loginWithPassword(req.body);
+    if (!result) return res.status(401).json({ error: 'Email ou senha invalidos' });
+    return res.json(result);
+  } catch (error) {
+    const message = String(error?.message || '');
+    if (message.includes('fetch failed') || message.includes('ENOTFOUND') || message.includes('Supabase nao configurado')) {
+      return res.status(503).json({ error: 'Supabase indisponivel ou nao configurado para login.' });
+    }
+    throw error;
+  }
 });
 
 router.post('/webhook/evolution', async (req, res) => {
@@ -94,24 +102,40 @@ router.post('/webhook/evolution', async (req, res) => {
 });
 
 router.get('/status', async (req, res) => {
-  const db = requireSupabase();
-  const company = await getCompany(req.query.companyId || process.env.DEFAULT_COMPANY_ID);
-  const settings = settingsFromCompany(company);
-  const supabaseCheck = await db.from('companies').select('id').eq('id', company.id).limit(1);
-  const evolution = await getEvolutionInstanceStatus(company);
-  const sheets = await fetchGoogleSheetFaqs(settings).then((rows) => ({ ok: true, count: rows.length })).catch((error) => ({
-    ok: false,
-    error: error.message
-  }));
-
-  res.json({
+  const status = {
     backend: { ok: true },
-    supabase: { ok: !supabaseCheck.error },
-    evolution,
-    openrouter: { ok: Boolean(process.env.OPENROUTER_API_KEY), model: settings.assistant.model },
-    googleSheets: settings.google_sheets.enabled ? sheets : { ok: true, enabled: false },
+    supabase: { ok: false, error: 'Nao testado' },
+    evolution: { ok: false, error: 'Nao testado' },
+    openrouter: {
+      ok: Boolean(process.env.OPENROUTER_API_KEY),
+      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free'
+    },
+    googleSheets: { ok: true, enabled: false },
     dashboard: { url: process.env.DASHBOARD_PUBLIC_URL || null }
-  });
+  };
+
+  try {
+    const db = requireSupabase();
+    const company = await getCompany(req.query.companyId || process.env.DEFAULT_COMPANY_ID);
+    const settings = settingsFromCompany(company);
+    const supabaseCheck = await db.from('companies').select('id').eq('id', company.id).limit(1);
+    status.supabase = {
+      ok: !supabaseCheck.error,
+      error: supabaseCheck.error?.message || null
+    };
+    status.openrouter.model = settings.assistant.model;
+    status.evolution = await getEvolutionInstanceStatus(company);
+    if (settings.google_sheets.enabled) {
+      status.googleSheets = await fetchGoogleSheetFaqs(settings)
+        .then((rows) => ({ ok: true, enabled: true, count: rows.length }))
+        .catch((error) => ({ ok: false, enabled: true, error: error.message }));
+    }
+  } catch (error) {
+    status.supabase = { ok: false, error: error.message };
+    status.evolution = { ok: false, error: 'Configure e valide Supabase primeiro.' };
+  }
+
+  res.json(status);
 });
 
 router.use(requireAuth);

@@ -64,3 +64,5 @@ Depois de criar usuarios reais, ajuste `ALLOW_BOOTSTRAP_LOGIN=false`.
 Railway e Vercel podem ficar conectados ao GitHub. Com isso, cada push em `main` publica uma nova versao do backend e do dashboard.
 
 O CI do repositorio roda instalacao de dependencias, checagem do backend e build do dashboard.
+
+Checklist de go-live: `docs/deploy-checklist.md`.

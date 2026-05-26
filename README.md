@@ -114,6 +114,8 @@ Conecte este repositorio ao Railway e a Vercel. Depois disso, cada push na branc
 
 O workflow `.github/workflows/ci.yml` valida backend e dashboard em pull requests e pushes.
 
+Checklist operacional: `docs/deploy-checklist.md`.
+
 ## Evolution API
 
 Hospede ou use uma Evolution API acessivel pela internet. No painel:
@@ -197,3 +199,9 @@ Quando o PWA estiver habilitado no navegador, use `Adicionar a tela inicial`.
 - Troque `AUTH_SECRET`, usuario inicial e senhas antes de producao.
 - Depois de criar usuarios reais, defina `ALLOW_BOOTSTRAP_LOGIN=false`.
 - Use um segredo em `WEBHOOK_SHARED_SECRET` se sua Evolution API permitir configurar headers ou query string.
+
+## Variaveis .env
+
+- Backend local: `backend/.env.example`
+- Dashboard local: `dashboard/.env.example`
+- Referencia consolidada: `.env.example`
