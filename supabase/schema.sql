@@ -1,3 +1,14 @@
+-- ============================================================
+-- ArthillesBot - Schema Supabase (Plano Gratuito)
+-- ============================================================
+-- IMPORTANTE SOBRE O USUARIO INICIAL (BOOTSTRAP):
+-- O hash abaixo usa a string literal 'change_me_auth_secret'.
+-- Para o login inicial funcionar:
+--   1. No Railway, defina AUTH_SECRET=change_me_auth_secret (temporariamente)
+--   2. Rode este schema
+--   3. Depois troque para um segredo forte e rode o SQL de correcao abaixo
+-- ============================================================
+
 create extension if not exists "pgcrypto";
 
 create table if not exists public.companies (
@@ -123,6 +134,7 @@ insert into public.companies (id, name, slug, evolution_instance_name)
 values ('00000000-0000-0000-0000-000000000001', 'Arthilles Demo', 'arthilles-demo', 'arthilles-demo')
 on conflict (id) do nothing;
 
+-- Usuario inicial (bootstrap) - veja aviso no topo do arquivo
 insert into public.app_users (company_id, name, email, password_hash, role)
 values (
   '00000000-0000-0000-0000-000000000001',
@@ -138,3 +150,12 @@ values
   ('00000000-0000-0000-0000-000000000001', 'Como funciona o atendimento?', 'O atendimento automatico tira duvidas pelo WhatsApp e encaminha para agendamento quando o cliente quiser falar com a empresa.', array['atendimento', 'funciona']),
   ('00000000-0000-0000-0000-000000000001', 'Quais horarios estao disponiveis?', 'Os horarios aparecem automaticamente respeitando agenda, bloqueios e antecedencia minima.', array['horario', 'agenda', 'disponivel'])
 on conflict do nothing;
+
+-- ============================================================
+-- SQL PARA CORRIGIR USUARIO APOS MUDAR AUTH_SECRET (execute no SQL Editor)
+-- Troque 'SEU_NOVO_AUTH_SECRET_AQUI' e rode:
+-- ============================================================
+-- UPDATE public.app_users
+-- SET password_hash = encode(digest('admin123:SEU_NOVO_AUTH_SECRET_AQUI', 'sha256'), 'hex')
+-- WHERE email = 'admin@arthilles.local';
+-- ============================================================
