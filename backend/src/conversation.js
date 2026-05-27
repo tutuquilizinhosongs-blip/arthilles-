@@ -232,14 +232,23 @@ export async function handleConversation({ company, phone: rawPhone, body, rawPa
     }
   } else {
     const faq = await findFaqAnswer(company, settings, cleanBody);
-    const ai = faq.answer || await askOpenRouter({
-      company,
-      settings,
-      context: { state: session.state, phone },
-      message: cleanBody,
-      faqs: faq.faqs
-    });
-    reply = ai || 'Posso responder duvidas ou agendar um atendimento. Para comecar um agendamento, envie "agendar".';
+    if (faq.answer) {
+      reply = faq.answer;
+    } else {
+      const ai = await askOpenRouter({
+        company,
+        settings,
+        context: { state: session.state, phone },
+        message: cleanBody,
+        faqs: faq.faqs
+      });
+      if (ai) {
+        reply = ai;
+      } else {
+        // Fallback 100% gratuito quando nao ha match na FAQ e OpenRouter nao configurado ou falhou
+        reply = 'Sua pergunta foi encaminhada para nossa equipe. Em breve responderemos com mais detalhes.';
+      }
+    }
   }
 
   await storeMessage(company.id, phone, 'outbound', reply);
