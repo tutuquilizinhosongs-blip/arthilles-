@@ -1,3 +1,21 @@
+// Cache simples em memoria para evitar chamadas repetidas ao Google Sheets (estabilidade no plano gratuito)
+const cache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+function getCached(key) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCached(key, data) {
+  cache.set(key, { data, ts: Date.now() });
+}
+
 function parseCsvLine(line, delimiter = ',') {
   const values = [];
   let current = '';
@@ -50,6 +68,11 @@ export async function fetchGoogleSheetFaqs(settings = {}) {
   if (!enabled) return [];
 
   const url = normalizeSheetUrl(csvUrl);
+  const cacheKey = url;
+
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
   const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!response.ok) throw new Error(`Google Sheets retornou HTTP ${response.status}`);
 
@@ -65,7 +88,7 @@ export async function fetchGoogleSheetFaqs(settings = {}) {
 
   if (questionIndex < 0 || answerIndex < 0) return [];
 
-  return lines.slice(1).map((line) => {
+  const rows = lines.slice(1).map((line) => {
     const values = parseCsvLine(line, delimiter);
     return {
       question: values[questionIndex] || '',
@@ -73,4 +96,7 @@ export async function fetchGoogleSheetFaqs(settings = {}) {
       keywords: (values[keywordsIndex] || '').split(/[;,]/).map((item) => item.trim()).filter(Boolean)
     };
   }).filter((item) => item.question && item.answer);
+
+  setCached(cacheKey, rows);
+  return rows;
 }
