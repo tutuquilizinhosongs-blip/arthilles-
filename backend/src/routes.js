@@ -51,10 +51,12 @@ router.get('/', (req, res) => {
   res.json({
     ok: true,
     name: 'ArthillesBot API',
-    mode: 'saas',
-    stack: ['Node.js', 'Supabase', 'Evolution API', 'OpenRouter', 'Google Sheets'],
+    mode: 'saas-gratuito',
+    stack: ['Node.js', 'Supabase', 'Evolution API', 'Google Sheets (FAQ principal)', 'OpenRouter (opcional)'],
     health: '/health',
-    docs: 'README.md'
+    status: '/status',
+    docs: 'README.md',
+    fallback: 'Quando sem FAQ e sem OpenRouter: encaminha para equipe humana'
   });
 });
 
@@ -102,13 +104,16 @@ router.post('/webhook/evolution', async (req, res) => {
 });
 
 router.get('/status', async (req, res) => {
+  const hasOpenRouterKey = Boolean(process.env.OPENROUTER_API_KEY);
   const status = {
     backend: { ok: true },
     supabase: { ok: false, error: 'Nao testado' },
     evolution: { ok: false, error: 'Nao testado' },
-    openrouter: {
-      ok: Boolean(process.env.OPENROUTER_API_KEY),
-      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free'
+    assistant: {
+      mode: hasOpenRouterKey ? 'openrouter' : 'faq-only-handoff',
+      description: hasOpenRouterKey 
+        ? 'FAQ + OpenRouter (respostas inteligentes)' 
+        : 'FAQ + encaminhamento manual (100% gratuito)'
     },
     googleSheets: { ok: true, enabled: false },
     dashboard: { url: process.env.DASHBOARD_PUBLIC_URL || null }
@@ -123,13 +128,17 @@ router.get('/status', async (req, res) => {
       ok: !supabaseCheck.error,
       error: supabaseCheck.error?.message || null
     };
-    status.openrouter.model = settings.assistant.model;
+
     status.evolution = await getEvolutionInstanceStatus(company);
+
     if (settings.google_sheets.enabled) {
       status.googleSheets = await fetchGoogleSheetFaqs(settings)
-        .then((rows) => ({ ok: true, enabled: true, count: rows.length }))
+        .then((rows) => ({ ok: true, enabled: true, count: rows.length, cached: true }))
         .catch((error) => ({ ok: false, enabled: true, error: error.message }));
     }
+
+    // Informacao clara sobre o modo de operacao
+    status.assistant.model = hasOpenRouterKey ? (settings.assistant.model || process.env.OPENROUTER_MODEL) : 'desativado (faq + handoff)'
   } catch (error) {
     status.supabase = { ok: false, error: error.message };
     status.evolution = { ok: false, error: 'Configure e valide Supabase primeiro.' };
