@@ -1,84 +1,61 @@
-# Deploy Checklist
+# Deploy Checklist - ArthillesBot (100% Gratuito)
 
-Use este checklist para colocar o Arthilles em producao SaaS.
+Foco: fazer funcionar com **apenas FAQ do Google Sheets + mensagem de encaminhamento para equipe**. OpenRouter e totalmente opcional.
 
-## 1. Supabase
+## 1. Supabase (gratuito)
 
-- [ ] Projeto criado no Supabase.
-- [ ] Script `supabase/schema.sql` executado no SQL Editor.
-- [ ] `SUPABASE_URL` copiada.
-- [ ] `SUPABASE_ANON_KEY` copiada.
-- [ ] `SUPABASE_SERVICE_ROLE_KEY` copiada.
-- [ ] Usuario inicial confirmado em `app_users` (ou criado novo admin).
+- [ ] Projeto criado (plano gratuito)
+- [ ] Script `supabase/schema.sql` executado (leia os avisos sobre AUTH_SECRET no topo!)
+- [ ] Chaves copiadas: URL, ANON_KEY, SERVICE_ROLE_KEY
+- [ ] Usuario bootstrap testado (ou crie admin manualmente)
 
-## 2. Backend (Railway)
+## 2. Backend Railway (gratuito)
 
-- [ ] Servico criado com raiz em `backend`.
-- [ ] Build Strategy = `Dockerfile` (arquivo `Dockerfile` dentro de `backend`).
-- [ ] Build Command vazio.
-- [ ] Variaveis configuradas:
-  - `NODE_ENV=production`
-  - `AUTH_SECRET`
-  - `ALLOW_BOOTSTRAP_LOGIN`
-  - `ADMIN_EMAIL`
-  - `ADMIN_PASSWORD`
-  - `DEFAULT_COMPANY_ID`
-  - `SUPABASE_URL`
-  - `SUPABASE_ANON_KEY`
-  - `SUPABASE_SERVICE_ROLE_KEY`
-  - `OPENROUTER_API_KEY`
-  - `OPENROUTER_MODEL`
-  - `BACKEND_PUBLIC_URL`
-  - `DASHBOARD_PUBLIC_URL`
-  - `CORS_ORIGIN` (ex.: `https://SEU-FRONTEND.vercel.app,https://*.vercel.app`)
-  - `WEBHOOK_SHARED_SECRET` (opcional)
-  - `GOOGLE_SHEETS_CSV_URL` (opcional, fallback do painel)
-  - `EVOLUTION_API_URL`
-  - `EVOLUTION_API_KEY`
-- [ ] `NPM_CONFIG_PRODUCTION` ausente (ou `false`).
-- [ ] Deploy realizado com `npm start`.
-- [ ] Healthcheck Railway apontando para `/health`.
+- [ ] Root Directory = `backend`
+- [ ] Build = Dockerfile (dentro da pasta backend)
+- [ ] Healthcheck = `/health`
+- [ ] Variaveis minimas obrigatorias:
+  - NODE_ENV=production
+  - AUTH_SECRET (forte!)
+  - SUPABASE_*
+  - EVOLUTION_API_URL + KEY + INSTANCE
+  - BACKEND_PUBLIC_URL (dominio gerado)
+  - DASHBOARD_PUBLIC_URL
+  - CORS_ORIGIN
+  - GOOGLE_SHEETS_CSV_URL (sua planilha de FAQ)
+- [ ] OpenRouter: deixe vazio para modo FAQ puro (recomendado para comecar)
+- [ ] Deploy + teste /health
 
-## 3. Dashboard (Vercel)
+## 3. Dashboard Vercel (gratuito)
 
-- [ ] Projeto criado com raiz em `dashboard`.
-- [ ] Variavel `NEXT_PUBLIC_API_URL` configurada com a URL publica do backend.
-- [ ] Variavel `SUPABASE_URL` configurada.
-- [ ] Variavel `SUPABASE_ANON_KEY` configurada.
-- [ ] Deploy concluido sem erro.
+- [ ] Root Directory = `dashboard`
+- [ ] NEXT_PUBLIC_API_URL = URL do backend Railway
+- [ ] Deploy
 
 ## 4. Evolution API
 
-- [ ] Evolution API publicada com URL HTTPS.
-- [ ] API key criada.
-- [ ] No painel Arthilles, configurados:
-  - URL Evolution
-  - Nome da instancia
-  - API key
-- [ ] Botao `Criar instancia` executado.
-- [ ] Botao `Gerar QR Code` executado.
-- [ ] QR lido no WhatsApp.
-- [ ] Botao `Configurar webhook` executado.
+- [ ] Instancia criada + QR lido
+- [ ] Webhook configurado (use WEBHOOK_SHARED_SECRET se possivel)
 
-## 5. Google Sheets FAQ
+## 5. Google Sheets FAQ (principal)
 
-- [ ] Planilha publica criada com colunas `pergunta,resposta,palavras`.
-- [ ] Link CSV configurado em `Configuracoes`.
-- [ ] Botao `Testar planilha` retorna contagem maior que zero.
+- [ ] Planilha publica com colunas pergunta,resposta,palavras
+- [ ] Link CSV colado em Configuracoes
+- [ ] Teste no painel retorna linhas
 
-## 6. Smoke Tests
+## 6. Testes Obrigatorios (modo gratuito)
 
-- [ ] `GET {BACKEND_PUBLIC_URL}/` retorna `200`.
-- [ ] `GET {BACKEND_PUBLIC_URL}/health` retorna `ok: true`.
-- [ ] `GET {BACKEND_PUBLIC_URL}/status` retorna diagnostico JSON.
-- [ ] Login no dashboard funciona com usuario valido.
-- [ ] Dashboard abre e carrega cards principais.
-- [ ] Envio de mensagem `oi` no WhatsApp gera mensagem em `Conversas`.
-- [ ] Fluxo `agendar` cria registro em `Agendamentos`.
+- [ ] /health OK + supabaseOk true
+- [ ] /status mostra googleSheets com count > 0
+- [ ] Login funciona
+- [ ] Enviar "oi" no WhatsApp -> resposta de boas vindas
+- [ ] Enviar pergunta que existe na planilha -> resposta da FAQ
+- [ ] Enviar pergunta desconhecida -> "Sua pergunta foi encaminhada para nossa equipe..."
+- [ ] Fluxo "agendar" funciona ate o agendamento
 
-## 7. URLs finais
+## 7. Apos primeiro uso
 
-- Dashboard: `https://SEU-PROJETO.vercel.app`
-- Backend: `https://SEU-SERVICO.up.railway.app`
-- Backend health: `https://SEU-SERVICO.up.railway.app/health`
-- Backend status: `https://SEU-SERVICO.up.railway.app/status`
+- [ ] Crie usuario admin real no painel ou via SQL
+- [ ] Defina ALLOW_BOOTSTRAP_LOGIN=false no Railway
+- [ ] Troque senha do admin@arthilles.local (use o SQL no schema)
+- [ ] (Opcional) Adicione OpenRouter depois se quiser respostas mais inteligentes
