@@ -1,27 +1,30 @@
 # ArthillesBot
 
-ArthillesBot e um SaaS web simples para atendimento automatico no WhatsApp com agenda, CRM, FAQ por Google Sheets e IA via OpenRouter.
+ArthillesBot e um SaaS web simples para atendimento automatico no WhatsApp com agenda, CRM, FAQ por Google Sheets (100% gratuito) e IA opcional via OpenRouter.
 
-O projeto deixou de depender de Docker, n8n, Ollama e instalacao local pesada. A arquitetura atual e pensada para deploy gratuito ou de baixo custo em Vercel + Railway + Supabase.
+**Foco total em gratuidade e open source**: funciona perfeitamente so com FAQ (Google Sheets + faq_items no Supabase) + mensagem de encaminhamento para a equipe. Nenhuma API paga e obrigatoria.
 
-## Stack
+O projeto usa apenas ferramentas gratuitas: Vercel (frontend), Railway (backend), Supabase (banco gratuito), Google Sheets publico (FAQ) e Evolution API self-hosted/open source (WhatsApp).
 
-- Dashboard: Next.js responsivo, pronto para PWA
-- Backend: Node.js/Express
-- Banco: Supabase Postgres
-- WhatsApp: Evolution API
-- IA: OpenRouter
-- FAQ externa: Google Sheets publicado em CSV
+## Stack (100% gratuito / open source)
+
+- Dashboard: Next.js responsivo, pronto para PWA (Vercel Hobby gratuito)
+- Backend: Node.js/Express (Railway gratuito)
+- Banco: Supabase Postgres (plano gratuito)
+- WhatsApp: Evolution API (instancia propria gratuita)
+- FAQ: Google Sheets publicado em CSV (gratuito)
+- IA: OpenRouter (opcional - use apenas modelos free ou desative completamente)
 
 ## Arquitetura
 
 ```text
 Cliente no WhatsApp
-  -> Evolution API
-  -> Webhook unico do backend Railway
+  -> Evolution API (gratuita)
+  -> Webhook do backend Railway
   -> Supabase
-  -> OpenRouter e/ou Google Sheets FAQ
-  -> Resposta pelo WhatsApp
+  -> FAQ Google Sheets + regras locais
+  -> (Opcional) OpenRouter IA
+  -> Resposta automatica ou "Sua pergunta foi encaminhada para nossa equipe..."
 
 Administrador
   -> Dashboard Next.js na Vercel
@@ -31,16 +34,17 @@ Administrador
 
 ## Funcionalidades
 
-- Login no painel
+- Login no painel (auth proprio leve, sem provedor pago)
 - Base multiempresa com `company_id`
-- Conexao WhatsApp por QR Code
-- Recebimento de mensagens por webhook
-- Respostas automaticas por FAQ e IA
+- Conexao WhatsApp por QR Code (Evolution)
+- Recebimento de mensagens por webhook seguro (com shared secret opcional)
+- Respostas automaticas por FAQ (Sheets + local) + fallback para equipe humana
 - Cadastro automatico de clientes
-- Agendamento automatico com bloqueios
-- Painel de clientes, conversas, agendamentos, duvidas e configuracoes
-- Configuracao de marca, cores, horarios, Google Sheets, OpenRouter e Evolution API
-- Dashboard responsivo para Android
+- Agendamento automatico com bloqueios e antecedencia minima
+- Painel completo (clientes, conversas, agendamentos, configuracoes)
+- Configuracao de marca, cores, horarios, Google Sheets, Evolution API
+- IA OpenRouter 100% opcional (desative removendo a chave)
+- Dashboard responsivo para Android (PWA)
 
 ## Estrutura
 
@@ -54,13 +58,15 @@ supabase/      Schema SQL inicial
 
 ## Configuracao Do Banco
 
-1. Crie um projeto no Supabase.
+1. Crie um projeto no Supabase (plano gratuito).
 2. Abra `SQL Editor`.
 3. Execute o arquivo:
 
 ```text
 supabase/schema.sql
 ```
+
+Leia os comentarios no topo do schema sobre o usuario inicial e AUTH_SECRET.
 
 O schema cria uma empresa demo e um usuario inicial:
 
@@ -69,165 +75,130 @@ email: admin@arthilles.local
 senha: admin123
 ```
 
-Troque a senha antes de usar em producao. O hash depende de `AUTH_SECRET`; se mudar `AUTH_SECRET`, gere novo `password_hash`.
+**Apos o primeiro login, troque a senha e defina ALLOW_BOOTSTRAP_LOGIN=false no Railway.**
 
-## Backend No Railway
+## Backend No Railway (gratuito)
 
 1. Crie um novo projeto Railway apontando para a pasta `backend`.
 2. Em `Settings` do servico:
    - `Root Directory`: `backend`
-   - `Build Strategy`: `Dockerfile` (arquivo `Dockerfile` dentro de `backend`)
-   - `Build Command`: vazio (o build e feito pelo Dockerfile)
+   - `Build Strategy`: `Dockerfile`
+   - `Build Command`: vazio
    - `Start Command`: `npm start`
    - `Healthcheck Path`: `/health`
-3. Configure as variaveis:
+3. Configure as variaveis minimas (veja lista completa em docs):
 
 ```env
 NODE_ENV=production
-AUTH_SECRET=troque_este_segredo
-ALLOW_BOOTSTRAP_LOGIN=true
+AUTH_SECRET=um_segredo_forte_aqui
+ALLOW_BOOTSTRAP_LOGIN=true          # desative depois
 ADMIN_EMAIL=admin@arthilles.local
 ADMIN_PASSWORD=admin123
-SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_ANON_KEY=sua_anon_key
-SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key
 DEFAULT_COMPANY_ID=00000000-0000-0000-0000-000000000001
-OPENROUTER_API_KEY=sua_chave_openrouter
-OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
-BACKEND_PUBLIC_URL=https://seu-backend.railway.app
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+BACKEND_PUBLIC_URL=https://seu-backend.up.railway.app
 DASHBOARD_PUBLIC_URL=https://seu-dashboard.vercel.app
 CORS_ORIGIN=https://seu-dashboard.vercel.app,https://*.vercel.app
-WEBHOOK_SHARED_SECRET=um_segredo_opcional
-GOOGLE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/.../export?format=csv
-EVOLUTION_API_URL=https://sua-evolution-api.exemplo.com
-EVOLUTION_API_KEY=sua_evolution_api_key
+GOOGLE_SHEETS_CSV_URL=...          # FAQ (principal)
+EVOLUTION_API_URL=...
+EVOLUTION_API_KEY=...
+
+# OpenRouter (OPCIONAL - remova ou deixe vazio para usar so FAQ + handoff)
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
 ```
 
-4. Nao defina `NPM_CONFIG_PRODUCTION=true` no Railway (isso reativa fluxo legado com warning de `production`).
-5. Gere um dominio publico em `Networking` e valide:
+4. Nao defina `NPM_CONFIG_PRODUCTION=true`.
+5. Valide: GET https://SEU-BACKEND.up.railway.app/health
 
-```text
-GET https://SEU-BACKEND.up.railway.app/health
-```
+## Dashboard Na Vercel (gratuito)
 
-## Dashboard Na Vercel
+1. Crie projeto Vercel -> Root Directory = `dashboard`
+2. Variavel obrigatoria:
+   - NEXT_PUBLIC_API_URL=https://seu-backend.up.railway.app
+3. (Opcional para futuro) SUPABASE_URL / ANON_KEY
+4. Deploy.
 
-1. Crie um projeto Vercel apontando para a pasta `dashboard`.
-2. Configure:
+## Fallback para perguntas sem resposta (gratuito)
 
-```env
-NEXT_PUBLIC_API_URL=https://seu-backend.railway.app
-SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_ANON_KEY=sua_anon_key
-```
+Quando a pergunta nao bater com a FAQ do Google Sheets e OpenRouter nao estiver configurado (ou falhar), o bot responde automaticamente:
 
-3. Deploy normalmente.
+> Sua pergunta foi encaminhada para nossa equipe. Em breve responderemos com mais detalhes.
+
+Isso permite operacao 100% gratuita sem IA.
 
 ## Deploy Automatico
 
-Conecte este repositorio ao Railway e a Vercel. Depois disso, cada push na branch `main` gera novo deploy dos servicos configurados.
+Conecte o repositorio ao Railway e Vercel. Push na main redeploya tudo.
 
-O workflow `.github/workflows/ci.yml` valida backend e dashboard em pull requests e pushes.
+CI basico em .github/workflows/ci.yml
 
-Checklist operacional: `docs/deploy-checklist.md`.
-Passo a passo completo: `docs/deploy-passo-a-passo.md`.
+Guias detalhados: docs/deploy-checklist.md e docs/deploy-passo-a-passo.md
 
-## Evolution API
+## Evolution API (open source)
 
-Hospede ou use uma Evolution API acessivel pela internet. No painel:
+Hospede sua propria instancia (varias opcoes gratuitas/open source disponiveis) ou use um provedor barato.
 
-1. Abra `Configuracoes`.
-2. Preencha URL da Evolution, instancia e API key.
-3. Abra `WhatsApp`.
-4. Clique em `Criar instancia`.
-5. Clique em `Gerar QR Code`.
-6. Escaneie com o WhatsApp.
-7. Clique em `Configurar webhook`.
+No painel:
+1. Configuracoes -> Evolution
+2. WhatsApp -> Criar instancia + QR Code + Configurar webhook
 
-O webhook gerado segue este formato:
+Webhook: https://seu-backend.railway.app/webhook/evolution?companyId=ID
 
-```text
-https://seu-backend.railway.app/webhook/evolution?companyId=ID_DA_EMPRESA
-```
+## Google Sheets FAQ (principal mecanismo gratuito)
 
-## Google Sheets FAQ
+Colunas obrigatorias:
 
-Crie uma planilha publica com as colunas:
-
-```csv
 pergunta,resposta,palavras
-Como funciona?,Atendemos pelo WhatsApp e agendamos pelo painel.,atendimento;agenda
-```
 
-Publique como CSV e cole o link em `Configuracoes`.
+Publique a aba como CSV e cole o link export no painel.
+
+O backend faz cache de 5 minutos para estabilidade.
 
 ## Desenvolvimento Local
 
 Backend:
-
-```powershell
 cd backend
 copy .env.example .env
 npm install
 npm run dev
-```
 
 Dashboard:
-
-```powershell
 cd dashboard
 copy .env.example .env.local
 npm install
 npm run dev
-```
 
-Acesse:
+## Teste Rapido Do Fluxo (sem IA)
 
-- Dashboard: http://localhost:3000
-- Backend: http://localhost:3001
-- Status: http://localhost:3000/status
+1. Configure apenas Supabase + Evolution + Google Sheets FAQ
+2. Conecte WhatsApp
+3. Envie mensagens que batam com sua planilha
+4. Envie perguntas fora da FAQ -> recebe o handoff para equipe
+5. Use "agendar" para testar fluxo completo de agendamento
 
-## Teste Rapido Do Fluxo
+## Android / PWA
 
-1. Entre no painel.
-2. Configure Supabase, Evolution API, OpenRouter e Google Sheets.
-3. Conecte o WhatsApp por QR Code.
-4. Envie `oi` para o numero conectado.
-5. Envie `agendar`.
-6. Responda os dados solicitados.
-7. Escolha um horario da lista.
-8. Confira o cliente, mensagens e agendamento no dashboard.
+Abra no celular e "Adicionar a tela inicial".
 
-## Android
+## Seguranca (importante no gratuito)
 
-O painel e responsivo. No celular, abra a URL da Vercel:
+- Service role key do Supabase SOMENTE no backend (nunca no Vercel)
+- Troque AUTH_SECRET e senha do admin em producao
+- Desative ALLOW_BOOTSTRAP_LOGIN apos criar usuarios reais
+- Use WEBHOOK_SHARED_SECRET sempre que possivel
+- Mantenha Evolution API com firewall/restricoes se possivel
 
-```text
-https://seu-dashboard.vercel.app
-```
+## Variaveis de Ambiente Essenciais (gratuito)
 
-Quando o PWA estiver habilitado no navegador, use `Adicionar a tela inicial`.
+Obrigatorias para funcionamento basico (FAQ + WhatsApp):
+- SUPABASE_*
+- EVOLUTION_*
+- BACKEND_PUBLIC_URL
+- GOOGLE_SHEETS_CSV_URL
+- AUTH_SECRET
+- CORS_ORIGIN
 
-## Observacoes De Seguranca
-
-- Nunca exponha `SUPABASE_SERVICE_ROLE_KEY` no dashboard.
-- A service role key fica somente no backend.
-- Troque `AUTH_SECRET`, usuario inicial e senhas antes de producao.
-- Depois de criar usuarios reais, defina `ALLOW_BOOTSTRAP_LOGIN=false`.
-- Use um segredo em `WEBHOOK_SHARED_SECRET` se sua Evolution API permitir configurar headers ou query string.
-
-## Variaveis .env
-
-- Backend local: `backend/.env.example`
-- Dashboard local: `dashboard/.env.example`
-- Referencia consolidada: `.env.example`
-
-Variaveis de integracao pedidas neste projeto:
-- `NEXT_PUBLIC_API_URL`
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `OPENROUTER_API_KEY`
-- `GOOGLE_SHEETS_CSV_URL`
-- `EVOLUTION_API_URL`
-- `EVOLUTION_API_KEY`
+OpenRouter e totalmente opcional.
