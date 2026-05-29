@@ -4,13 +4,19 @@ import { getAvailableSlots } from './availability.js';
 import { hashPassword, loginWithPassword, requireAuth } from './auth.js';
 import { handleConversation } from './conversation.js';
 import { getCompany, getCompanyByInstance, requireSupabase, settingsFromCompany, updateCompanySettings } from './db.js';
-import { createEvolutionInstance, configureEvolutionWebhook, getEvolutionInstanceStatus, getEvolutionQrCode, sendWhatsAppText } from './evolution.js';
+import { connectEvolutionCompany, createEvolutionInstance, disconnectEvolutionInstance, getEvolutionInstanceStatus, getEvolutionQrCode, sendWhatsAppText } from './evolution.js';
+import { evolutionInstanceForCompanyId } from './evolutionInstance.js';
 import { fetchGoogleSheetFaqs } from './googleSheets.js';
 
 export const router = express.Router();
 
 function tenantId(req) {
   return req.user?.companyId || req.query.companyId || req.body?.companyId || process.env.DEFAULT_COMPANY_ID;
+}
+
+function ensureAdmin(req, res, next) {
+  if (['admin', 'super_admin'].includes(req.user?.role)) return next();
+  return res.status(403).json({ error: 'Acesso restrito a administradores.' });
 }
 
 function extractEvolutionMessage(payload) {
@@ -169,8 +175,17 @@ router.post('/companies', async (req, res) => {
   });
   const input = schema.parse(req.body);
   const db = requireSupabase();
-  const { data, error } = await db.from('companies').insert({ name: input.name, slug: input.slug, evolution_instance_name: input.slug }).select('*').single();
+  const { data, error } = await db.from('companies').insert({ name: input.name, slug: input.slug }).select('*').single();
   if (error) throw error;
+  const instanceName = evolutionInstanceForCompanyId(data.id);
+  if (instanceName && data.evolution_instance_name !== instanceName) {
+    const update = await db
+      .from('companies')
+      .update({ evolution_instance_name: instanceName })
+      .eq('id', data.id);
+    if (update.error) throw update.error;
+    data.evolution_instance_name = instanceName;
+  }
   if (input.adminEmail && input.adminPassword) {
     const user = await db.from('app_users').insert({
       company_id: data.id,
@@ -371,20 +386,30 @@ router.get('/faqs/google-sheets/preview', async (req, res) => {
   res.json({ ok: true, count: rows.length, rows: rows.slice(0, 20) });
 });
 
-router.get('/evolution/status', async (req, res) => {
+router.get('/evolution/status', ensureAdmin, async (req, res) => {
   res.json(await getEvolutionInstanceStatus(await getCompany(tenantId(req))));
 });
 
-router.post('/evolution/instance', async (req, res) => {
-  res.json(await createEvolutionInstance(await getCompany(tenantId(req))));
+router.post('/evolution/connect', ensureAdmin, async (req, res) => {
+  const result = await connectEvolutionCompany(await getCompany(tenantId(req)));
+  if (!result.ok) return res.status(400).json(result);
+  res.json(result);
 });
 
-router.post('/evolution/webhook', async (req, res) => {
-  res.json(await configureEvolutionWebhook(await getCompany(tenantId(req))));
+router.post('/evolution/disconnect', ensureAdmin, async (req, res) => {
+  const result = await disconnectEvolutionInstance(await getCompany(tenantId(req)));
+  if (!result.ok) return res.status(400).json(result);
+  const status = await getEvolutionInstanceStatus(await getCompany(tenantId(req)));
+  res.json({ ok: true, disconnect: result, status });
 });
 
-router.get('/evolution/qrcode', async (req, res) => {
+router.get('/evolution/qrcode', ensureAdmin, async (req, res) => {
   res.json(await getEvolutionQrCode(await getCompany(tenantId(req))));
+});
+
+// Legacy endpoints kept for backward compatibility.
+router.post('/evolution/instance', ensureAdmin, async (req, res) => {
+  res.json(await createEvolutionInstance(await getCompany(tenantId(req))));
 });
 
 router.get('/logs', async (req, res) => {

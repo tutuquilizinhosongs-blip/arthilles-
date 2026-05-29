@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { companyIdFromEvolutionInstance, evolutionInstanceForCompanyId } from './evolutionInstance.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -29,9 +30,15 @@ export function defaultBusinessHours() {
 export function normalizeCompany(company = {}) {
   const settings = company.settings || {};
   const business = { ...defaultBusinessHours(), ...(settings.business_hours || {}) };
+  const instanceName =
+    evolutionInstanceForCompanyId(company.id) ||
+    company.evolution_instance_name ||
+    process.env.EVOLUTION_INSTANCE_NAME ||
+    'arthilles';
 
   return {
     ...company,
+    evolution_instance_name: instanceName,
     settings: {
       welcomeMessage: settings.welcomeMessage || 'Ola! Sou o assistente virtual. Posso tirar duvidas ou agendar um horario.',
       business_hours: business,
@@ -57,6 +64,18 @@ export async function getCompany(companyId) {
 
 export async function getCompanyByInstance(instanceName) {
   const db = requireSupabase();
+  const companyId = companyIdFromEvolutionInstance(instanceName);
+
+  if (companyId) {
+    const { data, error } = await db
+      .from('companies')
+      .select('*')
+      .eq('id', companyId)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) return normalizeCompany(data);
+  }
+
   if (instanceName) {
     const { data, error } = await db
       .from('companies')
@@ -99,9 +118,7 @@ export function settingsFromCompany(company) {
       model: normalized.openrouter_model || process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free'
     },
     evolution: {
-      baseUrl: normalized.evolution_base_url || process.env.EVOLUTION_API_URL || process.env.EVOLUTION_BASE_URL || '',
-      instance: normalized.evolution_instance_name || process.env.EVOLUTION_INSTANCE_NAME || 'arthilles',
-      configured: Boolean(normalized.evolution_api_key || process.env.EVOLUTION_API_KEY)
+      configured: Boolean(process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY)
     }
   };
 }
@@ -130,15 +147,9 @@ export async function updateCompanySettings(companyId, payload = {}) {
     accent_color: payload.theme?.accentColor ?? current.accent_color,
     google_sheets_url: payload.google_sheets?.csvUrl ?? current.google_sheets_url,
     openrouter_model: payload.assistant?.model ?? current.openrouter_model,
-    evolution_base_url: payload.evolution?.baseUrl ?? current.evolution_base_url,
-    evolution_instance_name: payload.evolution?.instance ?? current.evolution_instance_name,
     settings: nextSettings,
     updated_at: new Date().toISOString()
   };
-
-  if (payload.evolution?.apiKey) {
-    changes.evolution_api_key = payload.evolution.apiKey;
-  }
 
   const { data, error } = await db
     .from('companies')

@@ -1,11 +1,13 @@
 import axios from 'axios';
 import { logger } from './logger.js';
+import { evolutionInstanceForCompanyId } from './evolutionInstance.js';
 
 function configForCompany(company = {}) {
+  const generatedInstance = evolutionInstanceForCompanyId(company.id);
   return {
-    baseURL: company.evolution_base_url || process.env.EVOLUTION_API_URL || process.env.EVOLUTION_BASE_URL,
-    apiKey: company.evolution_api_key || process.env.EVOLUTION_API_KEY,
-    instance: company.evolution_instance_name || process.env.EVOLUTION_INSTANCE_NAME || 'arthilles'
+    baseURL: process.env.EVOLUTION_API_URL || process.env.EVOLUTION_BASE_URL,
+    apiKey: process.env.EVOLUTION_API_KEY,
+    instance: generatedInstance || company.evolution_instance_name || process.env.EVOLUTION_INSTANCE_NAME || 'arthilles'
   };
 }
 
@@ -40,7 +42,7 @@ export async function configureEvolutionWebhook(company) {
     return { ok: false, skipped: true, error: 'Evolution ou BACKEND_PUBLIC_URL nao configurados' };
   }
 
-  const webhookUrl = `${publicUrl.replace(/\/$/, '')}/webhook/evolution?companyId=${company.id}`;
+  const webhookUrl = `${publicUrl.replace(/\/$/, '')}/webhook/evolution`;
   try {
     const response = await axios.post(
       `${config.baseURL}/webhook/set/${config.instance}`,
@@ -92,10 +94,33 @@ export async function createEvolutionInstance(company) {
   } catch (error) {
     const message = error.response?.data || error.message;
     if (JSON.stringify(message).toLowerCase().includes('already')) {
-      return { ok: true, instance: config.instance, data: message };
+      const webhook = await configureEvolutionWebhook(company);
+      return { ok: true, instance: config.instance, webhook, data: message, reused: true };
     }
     return { ok: false, instance: config.instance, error: message };
   }
+}
+
+export async function disconnectEvolutionInstance(company) {
+  const config = configForCompany(company);
+  if (!config.baseURL || !config.apiKey) return { ok: false, error: 'Evolution API nao configurada' };
+
+  const requestConfig = { headers: headers(config.apiKey), timeout: 15000 };
+  const attempts = [
+    { method: 'delete', url: `${config.baseURL}/instance/logout/${config.instance}` },
+    { method: 'delete', url: `${config.baseURL}/instance/logout` }
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const response = await axios({ ...attempt, ...requestConfig });
+      return { ok: true, instance: config.instance, data: response.data };
+    } catch (error) {
+      logger.warn({ err: error.response?.data || error.message, url: attempt.url }, 'Evolution logout attempt failed');
+    }
+  }
+
+  return { ok: false, instance: config.instance, error: 'Nao foi possivel desconectar a instancia no Evolution API' };
 }
 
 export async function getEvolutionQrCode(company) {
@@ -118,4 +143,20 @@ export async function getEvolutionQrCode(company) {
   }
 
   return { ok: false, instance: config.instance, error: 'Nao foi possivel obter QR Code da Evolution API' };
+}
+
+export async function connectEvolutionCompany(company) {
+  const created = await createEvolutionInstance(company);
+  if (!created.ok) return { ok: false, step: 'instance', ...created };
+
+  const qr = await getEvolutionQrCode(company);
+  const status = await getEvolutionInstanceStatus(company);
+
+  return {
+    ok: Boolean(created.ok && (qr.ok || status.ok)),
+    instance: created.instance,
+    created,
+    qr,
+    status
+  };
 }
