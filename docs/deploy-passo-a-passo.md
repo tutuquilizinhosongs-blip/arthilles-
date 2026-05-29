@@ -1,74 +1,99 @@
-# Deploy Passo a Passo - ArthillesBot (Foco Gratuito)
+# Deploy Passo a Passo (Railway + Vercel + Supabase)
 
-**Objetivo principal**: ter o sistema funcionando 100% gratis usando **somente FAQ do Google Sheets + mensagem automatica de encaminhamento** para a equipe. OpenRouter e opcional e pode ficar desativado.
+## 1. Preparar Supabase
 
-## Aviso Critico - Usuario Inicial e AUTH_SECRET
+1. Abra o projeto no Supabase.
+2. SQL Editor -> execute `supabase/schema.sql`.
+3. Copie:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
 
-O arquivo supabase/schema.sql cria o admin com hash baseado em 'change_me_auth_secret'.
+## 2. Deploy do backend no Railway
 
-**Solucao recomendada**:
-1. No primeiro deploy do Railway, defina temporariamente:
-   AUTH_SECRET=change_me_auth_secret
-2. Rode o schema no Supabase
-3. Teste login
-4. Imediatamente mude AUTH_SECRET para um valor forte
-5. Rode o SQL de atualizacao de senha que esta comentado no final do schema.sql
-
-Ou simplesmente crie um novo usuario admin via SQL apos o primeiro deploy.
-
-## 1. Supabase
-
-Crie projeto gratuito -> SQL Editor -> cole todo o conteudo de supabase/schema.sql
-
-## 2. Variaveis minimas (backend Railway)
+1. New Project -> Deploy from GitHub Repo.
+2. Selecione este repositorio.
+3. Service settings:
+   - Root directory: `backend`
+   - Build strategy: `Dockerfile`
+   - Start command: `npm start`
+   - Healthcheck: `/health`
+4. Configure variaveis:
 
 ```env
 NODE_ENV=production
-AUTH_SECRET=segredo_forte
-SUPABASE_URL=...
-SUPABASE_SERVICE_ROLE_KEY=...   # obrigatoria no backend
-EVOLUTION_API_URL=...
-EVOLUTION_API_KEY=...
-BACKEND_PUBLIC_URL=... (gere no Railway)
-DASHBOARD_PUBLIC_URL=...
-CORS_ORIGIN=...
-GOOGLE_SHEETS_CSV_URL=...   # sua FAQ principal
+LOG_LEVEL=info
 
-# Deixe vazias para modo 100% FAQ + handoff (recomendado para comecar)
+AUTH_SECRET=troque_por_um_segredo_forte
+ALLOW_BOOTSTRAP_LOGIN=true
+ADMIN_EMAIL=admin@arthilles.local
+ADMIN_PASSWORD=troque_essa_senha
+DEFAULT_COMPANY_ID=00000000-0000-0000-0000-000000000001
+
+SUPABASE_URL=https://SEU-PROJETO.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_...
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
+
+EVOLUTION_API_URL=https://SUA-EVOLUTION
+EVOLUTION_API_KEY=SUA_CHAVE
+
+BACKEND_PUBLIC_URL=https://SEU-BACKEND.up.railway.app
+DASHBOARD_PUBLIC_URL=https://SEU-FRONTEND.vercel.app
+CORS_ORIGIN=https://SEU-FRONTEND.vercel.app,https://*.vercel.app
+
+GOOGLE_SHEETS_CSV_URL=
 OPENROUTER_API_KEY=
+OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
+WEBHOOK_SHARED_SECRET=
 ```
 
-## 3. Vercel (dashboard)
+5. Gere dominio publico em Networking.
+6. Teste:
+   - `GET https://SEU-BACKEND.up.railway.app/health`
 
-Root = dashboard
-Apenas: NEXT_PUBLIC_API_URL = URL do backend
+## 3. Deploy do frontend no Vercel
 
-## 4. Ordem de configuracao
+1. Add New -> Project.
+2. Selecione o repositorio.
+3. Root directory: `dashboard`.
+4. Variaveis:
 
-1. Deploy backend Railway primeiro (gere dominio)
-2. Atualize NEXT_PUBLIC_API_URL no Vercel
-3. Deploy Vercel
-4. Atualize BACKEND_PUBLIC_URL + CORS no Railway
-5. Redeploy backend
+```env
+NEXT_PUBLIC_API_URL=https://SEU-BACKEND.up.railway.app
+SUPABASE_URL=https://SEU-PROJETO.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_...
+```
 
-## 5. WhatsApp + FAQ
+5. Deploy.
+6. Copie a URL publica do Vercel.
 
-- Configure Evolution no painel
-- Crie instancia + QR
-- Configure webhook
-- Crie planilha Google com colunas pergunta,resposta,palavras
-- Publique CSV e cole URL no painel
+## 4. Ajuste cruzado de URLs
 
-## 6. Teste sem IA (modo gratuito)
+1. No Railway, ajuste:
+   - `DASHBOARD_PUBLIC_URL=https://SEU-FRONTEND.vercel.app`
+   - `CORS_ORIGIN=https://SEU-FRONTEND.vercel.app,https://*.vercel.app`
+2. Redeploy backend.
 
-Envie para o WhatsApp:
-- Mensagens que batem com sua planilha -> respostas da FAQ
-- Qualquer outra coisa -> "Sua pergunta foi encaminhada para nossa equipe. Em breve responderemos com mais detalhes."
+## 5. Conectar WhatsApp (fluxo simplificado)
 
-Isso e o que garante que o sistema e viavel sem nenhum custo mensal.
+1. Entre no dashboard.
+2. Abra aba `WhatsApp`.
+3. Clique `Conectar WhatsApp`.
+4. Escaneie o QR Code.
+5. Aguarde status `Conectado`.
+6. Para desconectar, clique `Desconectar WhatsApp`.
 
-## Proximos passos opcionais
+Observacao: o cliente final nao precisa preencher URL da Evolution, API key, instancia ou webhook.
 
-- Adicionar OpenRouter depois (modelos free disponiveis)
-- Melhorar matching de FAQ
-- Adicionar notificacao de escalas (webhook Discord/Slack gratuito etc)
+## 6. Teste final
+
+1. Backend:
+   - `GET /health` -> 200
+   - `GET /status` -> `supabase.ok=true`
+2. Login no dashboard.
+3. Envie `oi` no WhatsApp conectado.
+4. Envie `agendar` e conclua o fluxo.
+5. Confira no painel:
+   - Clientes
+   - Conversas
+   - Agendamentos

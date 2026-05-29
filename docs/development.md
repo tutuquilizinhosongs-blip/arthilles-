@@ -68,7 +68,7 @@ Tabelas principais:
 1. `GET /health`
 2. Login pelo dashboard
 3. `GET /status`
-4. Configurar Evolution API no painel
-5. Criar instancia e gerar QR Code
+4. Garantir `EVOLUTION_API_URL` e `EVOLUTION_API_KEY` no backend
+5. Na aba WhatsApp, clicar `Conectar WhatsApp` e escanear QR Code
 6. Enviar `oi` para o WhatsApp conectado
 7. Enviar `agendar` e concluir o fluxo

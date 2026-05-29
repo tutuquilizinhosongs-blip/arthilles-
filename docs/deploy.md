@@ -57,12 +57,18 @@ SUPABASE_ANON_KEY=sua_anon_key
 
 ## 4. Evolution API
 
-No painel Arthilles:
+Configure no Railway as variaveis:
 
-1. Abra `Configuracoes`.
-2. Configure URL, instancia e API key.
-3. Abra `WhatsApp`.
-4. Crie instancia, gere QR Code e configure webhook.
+- `EVOLUTION_API_URL`
+- `EVOLUTION_API_KEY`
+
+No painel Arthilles (cliente final):
+
+1. Abra `WhatsApp`.
+2. Clique `Conectar WhatsApp`.
+3. Escaneie o QR Code.
+4. Veja o status `Conectado`.
+5. Para trocar aparelho/numero, use `Desconectar WhatsApp`.
 
 ## 5. Validacao
 

@@ -66,10 +66,7 @@ function initialSettings() {
     welcomeMessage: 'Ola! Sou o assistente virtual. Posso tirar duvidas ou agendar um horario.',
     googleSheetsUrl: '',
     aiEnabled: true,
-    openrouterModel: 'meta-llama/llama-3.1-8b-instruct:free',
-    evolutionBaseUrl: '',
-    evolutionInstance: 'arthilles',
-    evolutionApiKey: ''
+    openrouterModel: 'meta-llama/llama-3.1-8b-instruct:free'
   };
 }
 
@@ -93,13 +90,15 @@ export default function Dashboard() {
     status: {},
     blocks: [],
     logs: [],
-    qr: null
+    qr: null,
+    whatsapp: {}
   });
   const [settingsForm, setSettingsForm] = useState(initialSettings());
   const [faqForm, setFaqForm] = useState({ question: '', answer: '', keywords: '' });
   const [blockForm, setBlockForm] = useState({ title: '', starts_at: '', ends_at: '', block_type: 'manual' });
   const [companyForm, setCompanyForm] = useState({ name: '', slug: '', adminEmail: '', adminPassword: '' });
   const [qrSrc, setQrSrc] = useState('');
+  const [whatsappBusy, setWhatsappBusy] = useState(false);
 
   const nav = useMemo(() => [
     ['overview', Activity, 'Visao geral'],
@@ -126,16 +125,13 @@ export default function Dashboard() {
       welcomeMessage: settings.company?.welcomeMessage || 'Ola! Sou o assistente virtual. Posso tirar duvidas ou agendar um horario.',
       googleSheetsUrl: settings.google_sheets?.csvUrl || '',
       aiEnabled: settings.assistant?.enabled !== false,
-      openrouterModel: settings.assistant?.model || 'meta-llama/llama-3.1-8b-instruct:free',
-      evolutionBaseUrl: settings.evolution?.baseUrl || '',
-      evolutionInstance: settings.evolution?.instance || 'arthilles',
-      evolutionApiKey: ''
+      openrouterModel: settings.assistant?.model || 'meta-llama/llama-3.1-8b-instruct:free'
     });
   }
 
   async function loadAll() {
     setError('');
-    const [health, companies, clients, appointments, availability, settings, messages, conversations, faqs, status, blocks, logs] = await Promise.all([
+    const [health, companies, clients, appointments, availability, settings, messages, conversations, faqs, status, blocks, logs, whatsapp] = await Promise.all([
       request('/health').catch(() => ({ ok: false })),
       request('/companies').catch(() => []),
       request('/clients').catch(() => []),
@@ -147,9 +143,10 @@ export default function Dashboard() {
       request('/faqs').catch(() => []),
       request('/status').catch(() => ({})),
       request('/availability/blocks').catch(() => []),
-      request('/logs').catch(() => ({ application: [] }))
+      request('/logs').catch(() => ({ application: [] })),
+      request('/evolution/status').catch(() => ({}))
     ]);
-    setData((current) => ({ ...current, health, companies, clients, appointments, availability, settings, messages, conversations, faqs, status, blocks, logs: logs.application || [] }));
+    setData((current) => ({ ...current, health, companies, clients, appointments, availability, settings, messages, conversations, faqs, status, blocks, logs: logs.application || [], whatsapp }));
     hydrateSettings(settings);
   }
 
@@ -200,9 +197,64 @@ export default function Dashboard() {
     }
   }
 
-  async function loadQr() {
-    const qr = await request('/evolution/qrcode');
-    setData((current) => ({ ...current, qr }));
+  function whatsappState(source) {
+    return String(
+      source?.data?.instance?.state ||
+      source?.instance?.state ||
+      source?.data?.state ||
+      source?.state ||
+      ''
+    ).toLowerCase();
+  }
+
+  function isWhatsappConnected(source) {
+    const state = whatsappState(source);
+    return state === 'open' || state === 'connected';
+  }
+
+  function whatsappStatusText(source) {
+    const state = whatsappState(source);
+    if (state === 'open' || state === 'connected') return 'Conectado';
+    if (state === 'close' || state === 'closed') return 'Desconectado';
+    if (!state) return 'Aguardando configuracao';
+    return state;
+  }
+
+  async function refreshWhatsApp() {
+    const [status, qr] = await Promise.all([
+      request('/evolution/status').catch(() => ({})),
+      request('/evolution/qrcode').catch(() => ({ ok: false }))
+    ]);
+    setData((current) => ({ ...current, whatsapp: status, qr }));
+  }
+
+  async function connectWhatsApp() {
+    setWhatsappBusy(true);
+    setError('');
+    try {
+      const result = await request('/evolution/connect', { method: 'POST' });
+      setData((current) => ({ ...current, qr: result.qr || current.qr, whatsapp: result.status || current.whatsapp }));
+      await refreshWhatsApp();
+      setNotice('WhatsApp em processo de conexao. Escaneie o QR Code.');
+    } catch (err) {
+      setError(err.message || 'Nao foi possivel conectar o WhatsApp.');
+    } finally {
+      setWhatsappBusy(false);
+    }
+  }
+
+  async function disconnectWhatsApp() {
+    setWhatsappBusy(true);
+    setError('');
+    try {
+      const result = await request('/evolution/disconnect', { method: 'POST' });
+      setData((current) => ({ ...current, whatsapp: result.status || current.whatsapp, qr: null }));
+      setNotice('WhatsApp desconectado.');
+    } catch (err) {
+      setError(err.message || 'Nao foi possivel desconectar o WhatsApp.');
+    } finally {
+      setWhatsappBusy(false);
+    }
   }
 
   async function saveSettings(event) {
@@ -230,11 +282,6 @@ export default function Dashboard() {
       assistant: {
         enabled: settingsForm.aiEnabled,
         model: settingsForm.openrouterModel
-      },
-      evolution: {
-        baseUrl: settingsForm.evolutionBaseUrl,
-        instance: settingsForm.evolutionInstance,
-        ...(settingsForm.evolutionApiKey ? { apiKey: settingsForm.evolutionApiKey } : {})
       }
     };
 
@@ -353,12 +400,17 @@ export default function Dashboard() {
 
         {tab === 'whatsapp' && (
           <Panel title="Conexao WhatsApp">
-            <div className="actions">
-              <button onClick={() => request('/evolution/instance', { method: 'POST' }).then(loadQr)}><QrCode size={18} />Criar instancia</button>
-              <button onClick={loadQr}><QrCode size={18} />Gerar QR Code</button>
-              <button onClick={() => request('/evolution/webhook', { method: 'POST' }).then(() => setNotice('Webhook configurado.'))}>Configurar webhook</button>
+            <div className="row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <strong>Status da conexao</strong>
+              <span>{whatsappStatusText(data.whatsapp)}</span>
             </div>
-            {qrSrc ? <img className="qr" src={qrSrc} alt="QR Code WhatsApp" /> : <pre>{JSON.stringify(data.qr || data.status.evolution || {}, null, 2)}</pre>}
+            <div className="actions">
+              <button onClick={connectWhatsApp} disabled={whatsappBusy}><QrCode size={18} />Conectar WhatsApp</button>
+              <button onClick={disconnectWhatsApp} disabled={whatsappBusy}>Desconectar WhatsApp</button>
+              <button onClick={refreshWhatsApp} disabled={whatsappBusy}><RefreshCw size={18} />Atualizar status</button>
+            </div>
+            {!isWhatsappConnected(data.whatsapp) && qrSrc ? <img className="qr" src={qrSrc} alt="QR Code WhatsApp" /> : null}
+            {!isWhatsappConnected(data.whatsapp) ? <span>Clique em "Conectar WhatsApp" e escaneie o QR Code.</span> : <span>WhatsApp conectado e pronto para atendimento.</span>}
           </Panel>
         )}
 
@@ -436,14 +488,6 @@ export default function Dashboard() {
                 <label>Link CSV publicado<input placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv" value={settingsForm.googleSheetsUrl} onChange={(event) => setSettingsForm({ ...settingsForm, googleSheetsUrl: event.target.value })} /></label>
                 <button type="submit">Salvar Google Sheets</button>
                 <button type="button" onClick={() => request('/faqs/google-sheets/preview').then((preview) => setNotice(`Google Sheets: ${preview.count} linhas encontradas.`)).catch((err) => setError(err.message))}>Testar planilha</button>
-              </form>
-            </Panel>
-            <Panel title="Evolution API">
-              <form className="stack" onSubmit={saveSettings}>
-                <label>URL da Evolution<input placeholder="https://sua-evolution.railway.app" value={settingsForm.evolutionBaseUrl} onChange={(event) => setSettingsForm({ ...settingsForm, evolutionBaseUrl: event.target.value })} /></label>
-                <label>Instancia<input value={settingsForm.evolutionInstance} onChange={(event) => setSettingsForm({ ...settingsForm, evolutionInstance: event.target.value })} /></label>
-                <label>API Key<input type="password" placeholder="Preencha apenas para trocar" value={settingsForm.evolutionApiKey} onChange={(event) => setSettingsForm({ ...settingsForm, evolutionApiKey: event.target.value })} /></label>
-                <button type="submit">Salvar Evolution</button>
               </form>
             </Panel>
           </section>
